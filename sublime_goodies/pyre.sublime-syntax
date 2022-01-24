@@ -1,0 +1,72 @@
+%YAML 1.2
+---
+# See http://www.sublimetext.com/docs/3/syntax.html
+file_extensions:
+  - pyre
+scope: source.pyre
+
+contexts:
+  # The prototype context is prepended to all contexts but those setting
+  # meta_include_prototype: false.
+  prototype:
+    - include: comments
+
+  main:
+    # The main context is the initial starting point of our syntax.
+    # Include other contexts from here (or specify them directly).
+    - include: keywords
+    - include: numbers
+    - include: strings
+    - include: operators
+    - include: character
+
+  keywords:
+    # Keywords are if, else for and while.
+    # Note that blackslashes don't need to be escaped within single quoted
+    # strings in YAML. When using single quoted strings, only single quotes
+    # need to be escaped: this is done by using two single quotes next to each
+    # other.
+    - match: '\b(if|else|end|while|do|procedure|macro)\b'
+      scope: keyword.control.pyre
+    - match: '\b(memory|load|store|dup|2dup|3dup|peek|rot3|rot2|drot2|swap|drop|putchar|print)\b'
+      scope: keyword.primitives.pyre
+
+  operators:
+    - match: '\+|\-|\*|\=|\<|\>|\!'
+      scope: constant.operator.pyre
+
+  numbers:
+    - match: '\b(-)?[0-9.]+\b'
+      scope: constant.numeric.pyre
+
+  character:
+    - match: \'\\.\'
+      scope: constant.single_character.escaped.pyre
+    - match: "'.'"
+      scope: constant.single_character.notescaped.pyre
+
+  strings:
+    # Strings begin and end with quotes, and use backslashes as an escape
+    # character.
+    - match: '\"'
+      scope: punctuation.definition.string.begin.pyre
+      push: inside_string
+
+  inside_string:
+    - meta_include_prototype: false
+    - meta_scope: string.quoted.double.pyre
+    - match: '\\.'
+      scope: constant.character.escape.pyre
+    - match: '\"'
+      scope: punctuation.definition.string.end.pyre
+      pop: true
+
+  comments:
+    # Comments begin with a '#' and finish at the end of the line.
+    - match: '#'
+      scope: punctuation.definition.comment.pyre
+      push:
+        # This is an anonymous context push for brevity.
+        - meta_scope: comment.line.pound.pyre
+        - match: $\n?
+          pop: true

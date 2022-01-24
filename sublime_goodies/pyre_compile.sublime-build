@@ -1,0 +1,3 @@
+{
+   "cmd": ["python", "pyre.py", "$file", "--run"]
+}

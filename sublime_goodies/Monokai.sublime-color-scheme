@@ -1,0 +1,55 @@
+{
+    // http://www.sublimetext.com/docs/3/color_schemes.html
+    "variables": {
+        // "green": "#FF0000",
+    },
+    "globals": {
+        // "foreground": "var(green)",
+    },
+    "rules": [
+        {
+            // "scope": "string",
+            // "foreground": "#00FF00",
+        },
+        {
+            "name": "KeywordPyre",
+            "scope": "keyword.control.pyre",
+            "foreground": "var(yellow)"
+        },
+        {
+            "name": "KeywordPyre",
+            "scope": "keyword.primitives.pyre",
+            "foreground": "var(yellow)"
+        },
+        {
+            "name": "NumbersPyre",
+            "scope": "constant.numeric.pyre",
+            "foreground": "var(purple)"
+        },
+        {
+            "name": "String",
+            "scope": "string.quoted.double.pyre",
+            "foreground": "hsl(100, 45%, 50%)"
+        },
+        {
+            "name": "EscapedCharsPyre",
+            "scope": "constant.character.escape.pyre",
+            "foreground": "var(purple)"
+        },
+        {
+            "name": "EscapedSingleCharsPyre",
+            "scope": "constant.single_character.escaped.pyre",
+            "foreground": "var(purple)"
+        },
+        {
+            "name": "SingleCharsPyre",
+            "scope": "constant.single_character.notescaped.pyre",
+            "foreground": "var(purple)"
+        },
+        {
+            "name": "OperatorsPyre",
+            "scope": "constant.operator.pyre",
+            "foreground": "var(orange)"
+        },
+    ],
+}
