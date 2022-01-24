@@ -1,0 +1,111 @@
+test1:
+    code: |
+        procedure main
+            1 if
+                2 peek drop
+            end
+        end
+    expected: |
+        2
+test2:
+    code: |
+        procedure main
+            22 22 = if
+                40 peek drop
+            end
+            50 peek drop
+        end
+    expected: |
+        40
+        50
+test3:
+    code: |
+        procedure main
+            22 21 = if
+                40 peek drop
+            end
+            50 peek drop
+        end
+    expected: |
+        50
+test4:
+    code: |
+        procedure main
+            22 22 = if
+                40 peek drop
+            else
+                30 peek drop
+            end
+            50 peek drop
+        end
+    expected: |
+        40
+        50
+test5:
+    code: |
+        procedure main
+            22 21 = if
+                40 peek drop
+            else
+                30 peek drop
+            end
+            50 peek drop
+        end
+    expected: |
+        30
+        50
+test6:
+    code: |
+        procedure main
+            1 if
+                40 peek drop
+            else
+                1 if
+                    21 peek drop
+                else
+                    20 peek drop
+                end
+            end
+            50 peek drop
+        end
+    expected: |
+        40
+        50
+test7:
+    code: |
+        procedure main
+            0 if
+                40 peek drop
+            else
+                1 if
+                    20 peek drop
+                else
+                    21 peek drop
+                end
+            end
+            50 peek drop
+        end
+    expected: |
+        20
+        50
+test8:
+    code: |
+        procedure main
+            1 if
+                0 if
+                    30 peek drop
+                else
+                    24 peek drop
+                end
+            else
+                1 if
+                    20 peek drop
+                else
+                    21 peek drop
+                end
+            end
+            50 peek drop
+        end
+    expected: |
+        24
+        50

@@ -1,0 +1,66 @@
+test1:
+    code: |
+        procedure main
+            1 while dup 10 <= do
+                peek
+                1 +
+            end
+        end
+    expected: |
+        1
+        2
+        3
+        4
+        5
+        6
+        7
+        8
+        9
+        10
+test2:
+    code: |
+        procedure main
+            0 while dup 10 < do
+                peek
+                2 +
+            end
+        end
+    expected: |
+        0
+        2
+        4
+        6
+        8
+test3:
+    code: |
+        procedure main
+            5 while dup 0 != do
+                1 peek drop
+                1 -
+            end
+        end
+    expected: |
+        1
+        1
+        1
+        1
+        1
+test3:
+    code: |
+        procedure main
+            1 while dup 10 <= do
+                dup 1 = if 1 + end
+                dup 3 = if 1 + end
+                dup 5 = if 1 + end
+                dup 7 = if 1 + end
+                dup 9 = if 1 + end
+                dup peek drop
+                1 +
+            end
+        end
+    expected: |
+        2
+        4
+        6
+        8
+        10
