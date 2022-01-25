@@ -271,12 +271,17 @@ def _PUSH_STRING(self):
         f'    push    {self.label}',
         f'    push    {self.length}'
     ]
+
+
+# TODO make this a bit more automatic
 def _MACRO(self):
     raise RuntimeError('Macro operator reached assembly code')
 def _MACRO_EXPANSION(self):
     raise RuntimeError('Macro expansion operator reached assembly code')
 def _IMPORT(self):
     raise RuntimeError('Import operator reached assembly code')
+def _DEFINE(self):
+    raise RuntimeError('Define operator reached assembly code')
 
 
 def operator_to_implementation(operator):

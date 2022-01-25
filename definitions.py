@@ -68,6 +68,8 @@ class Operator(Enum):
     MACRO                 = 'macro'                 # noqa e241
     MACRO_EXPANSION       = Lexeme.MACRO_EXPANSION  # noqa e241
 
+    DEFINE                = 'define'                # noqa e241
+
     def __repr__(self):
         return f'{self.__class__.__name__}.{self.name}'
 

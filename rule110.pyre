@@ -36,9 +36,9 @@ macro get_110   # i
 end
 
 # Constants
-macro LENGTH 40 end
-macro MAX_BUFFER_SIZE 500 end
-macro LINES 40 end
+define LENGTH 40
+define MAX_BUFFER_SIZE 500
+define LINES 40
 
 
 procedure main

@@ -57,6 +57,12 @@ def tokenize(program: str) -> list:
                 tokens.extend(tokenize(imported_code))
                 global_state.imports.append(filename)
             continue
+        elif item == 'define':
+            name = next(code_iterator)
+            value = next(code_iterator)
+            macro_code = f'macro {name} {value} end'
+            tokens.extend(tokenize(macro_code))
+            continue
         else:
             lexeme = item
 
