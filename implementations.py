@@ -1,73 +1,336 @@
+# noqa e302
 """Module with the assembly implementation for each operator."""
 import sys
+import global_state
 from definitions import Token, Operator
+from parsing_utils import string_to_db
+
 
 def _ADD(self):
-    pass
+    return [
+        '    pop     rax',
+        '    pop     rbx',
+        '    add     rax, rbx',
+        '    push    rax'
+    ]
 def _SUB(self):
-    pass
+    return [
+        '    pop     rax',
+        '    pop     rbx',
+        '    sub     rbx, rax',
+        '    push    rbx'
+    ]
 def _MUL(self):
-    pass
+    return [
+        '    pop     rax',
+        '    pop     rbx',
+        '    imul     rax, rbx',
+        '    push    rax'
+    ]
 def _PEEK(self):
-    pass
+    return [
+        '    ;; PEEK',
+        '    mov     rdi, [rsp]',
+        '    call    peek',
+    ]
 def _DROP(self):
-    pass
+    return [
+        '    pop     rdi'
+    ]
 def _ROT2(self):
-    pass
+    return [
+        '    pop     rax',
+        '    pop     rbx',
+        '    push    rax',
+        '    push    rbx',
+    ]
+_SWAP = _ROT2
 def _DROT2(self):
-    pass
+    return [
+        # a b c d
+        # c d a b
+        '    pop     rdx',
+        '    pop     rcx',
+        '    pop     rbx',
+        '    pop     rax',
+        '    push    rcx',
+        '    push    rdx',
+        '    push    rax',
+        '    push    rbx',
+    ]
 def _ROT3(self):
-    pass
+    return [
+        '    pop     rax',
+        '    pop     rbx',
+        '    pop     rcx',
+        '    push    rbx',
+        '    push    rax',
+        '    push    rcx',
+    ]
 def _DUP(self):
-    pass
+    return [
+        '    pop     rax',
+        '    push    rax',
+        '    push    rax'
+    ]
 def _DUP2(self):
-    pass
+    return [
+        '    pop     rbx',
+        '    pop     rax',
+        '    push    rax',
+        '    push    rbx',
+        '    push    rax',
+        '    push    rbx'
+    ]
 def _DUP3(self):
-    pass
+    return [
+        '    pop     rcx',
+        '    pop     rbx',
+        '    pop     rax',
+        '    push    rax',
+        '    push    rbx',
+        '    push    rcx',
+        '    push    rax',
+        '    push    rbx',
+        '    push    rcx',
+    ]
 def _LOAD(self):
-    pass
+    return [
+        '    pop    rax',
+        '    mov    rbx, 0',  # Clear rbx
+        '    mov    bl, [rax]',  # Read one byte into rbx
+        '    push   rbx',
+    ]
 def _STORE(self):
-    pass
+    return [
+        '    pop    rbx',
+        '    pop    rax',
+        '    mov    [rax], bl',  # Write one byte from rbx
+    ]
 def _MEMORY(self):
-    pass
+    return [
+        '    push    memory',
+    ]
 def _PRINT(self):
-    pass
+    return [
+        '    ;; PRINT',
+        '    pop     rdx',  # the length
+        '    pop     rsi',  # the string
+        '    mov     rdi, STD_OUT',
+        '    mov     rax, SYS_WRITE',
+        '    syscall',
+    ]
 def _EQUAL(self):
-    pass
+    return [
+        '    mov     rcx, FALSE',
+        '    mov     rdx, TRUE',
+        '    pop     rax',
+        '    pop     rbx',
+        '    cmp     rax, rbx',
+        '    cmove   rcx, rdx',
+        '    push    rcx'
+    ]
 def _NOT_EQUAL(self):
-    pass
+    return [
+        '    mov     rcx, FALSE',
+        '    mov     rdx, TRUE',
+        '    pop     rax',
+        '    pop     rbx',
+        '    cmp     rax, rbx',
+        '    cmovne  rcx, rdx',
+        '    push    rcx'
+    ]
 def _LESS_THAN(self):
-    pass
+    return [
+        '    mov     rcx, FALSE',
+        '    mov     rdx, TRUE',
+        '    pop     rax',
+        '    pop     rbx',
+        '    cmp     rbx, rax',
+        '    cmovl   rcx, rdx',
+        '    push    rcx'
+    ]
 def _GREATER_THAN(self):
-    pass
+    return [
+        '    mov     rcx, FALSE',
+        '    mov     rdx, TRUE',
+        '    pop     rax',
+        '    pop     rbx',
+        '    cmp     rbx, rax',
+        '    cmovg   rcx, rdx',
+        '    push    rcx'
+    ]
 def _LESS_OR_EQUAL_THAN(self):
-    pass
+    return [
+        '    mov     rcx, FALSE',
+        '    mov     rdx, TRUE',
+        '    pop     rax',
+        '    pop     rbx',
+        '    cmp     rbx, rax',
+        '    cmovle   rcx, rdx',
+        '    push    rcx'
+    ]
 def _GREATER_OR_EQUAL_THAN(self):
-    pass
+    return [
+        '    mov     rcx, FALSE',
+        '    mov     rdx, TRUE',
+        '    pop     rax',
+        '    pop     rbx',
+        '    cmp     rbx, rax',
+        '    cmovge   rcx, rdx',
+        '    push    rcx'
+    ]
 def _IF(self):
-    pass
+    return [
+        '    ;; IF',
+        '    pop     rax',
+        '    cmp     rax, TRUE',
+        f'    jne      {self.end_token.label}'
+    ]
 def _ELSE(self):
-    pass
+    return [
+        f'    jmp    {self.end_token.label}'
+        '    ;; ELSE',
+        f'{self.label}:'
+    ]
 def _END(self):
-    pass
+    start_token = self.start_token
+    assert start_token is not None
+
+    if start_token.operator is Operator.IF or start_token.operator is Operator.ELSE:
+        return [
+            f'{self.label}:'
+        ]
+    elif start_token.operator is Operator.DO:
+        while_token = start_token.start_token
+        assert while_token is not None
+        return [
+            f'    jmp    {while_token.label}',
+            f'{self.label}:'
+        ]
+    elif start_token.operator is Operator.PROCEDURE:
+        if start_token.value == 'main':
+            return [
+                '    ;; EXIT',
+                '    mov     rdi, 0',  # Set exit code to 0
+                '    mov     rax, SYS_EXIT',
+                '    syscall',
+            ]
+        else:
+            return [
+                '    ret',
+            ]
 def _WHILE(self):
-    pass
+    return [
+        f'{self.label}:'
+    ]
 def _DO(self):
-    pass
+    print(self)
+    print(id(self))
+    return [
+        '    ;; DO',
+        '    mov    rcx, TRUE',
+        '    pop    rax',
+        '    cmp    rax, TRUE',
+        f'    jne    {self.end_token.label}'
+    ]
 def _PUTCHAR(self):
-    pass
+    return [
+        '    ;; PUTCHAR',
+        '    lea     rsi, [rsp]',
+        '    mov     rdi, STD_OUT',
+        '    mov     rdx, 1',
+        '    mov     rax, SYS_WRITE',
+        '    syscall',
+        '    pop     rbx',  # Get rid of the character
+    ]
 def _PROCEDURE(self):
-    pass
+    return [
+        f'{self.label}:',
+        '    push    rdi'
+    ]
 def _PROCEDURE_CALL(self):
-    pass
+    return [
+        f'   ;; CALL {self.value}',
+        f'   call    {self.value}'
+    ]
 def _PUSH_UINT(self):
-    pass
+    return [
+        f'    push    {self.value}'
+    ]
 def _PUSH_CHAR(self):
-    pass
+    return [
+        f'    push    {self.value}'
+    ]
 def _PUSH_STRING(self):
-    pass
+    if self not in global_state.add_symbols:
+        global_state.add_symbols.append(self)
+    return [
+        f'    push    {self.label}',
+        f'    push    {self.length}'
+    ]
+def _MACRO(self):
+    raise RuntimeError('Macro operator reached assembly code')
+def _MACRO_EXPANSION(self):
+    raise RuntimeError('Macro expansion operator reached assembly code')
 
 
 def operator_to_implementation(operator):
     this_module = sys.modules[__name__]
     return getattr(this_module, '_' + operator.name)
+
+
+def get_implementation(operator):
+    this_module = sys.modules[__name__]
+    return getattr(this_module, '_' + operator.name)
+
+
+def lexeme_to_operator(lexeme):
+    lexeme_to_operator_dict = {item.value: item for item in Operator}
+    return lexeme_to_operator_dict[lexeme]
+
+
+def create_token_basic(operator, value, code_iterator, implementation):
+    token = Token(operator, value=value, implementation=implementation)
+    return token
+
+
+def create_token_SWAP(operator, value, code_iterator, implementation):
+    return operator_to_token(Operator.ROT2, value, code_iterator, implementation)
+
+
+def create_token_PUSH_STRING(operator, value, code_iterator, implementation):
+    value, length = string_to_db(value)
+    token = Token(Operator.PUSH_STRING,
+                  value=value,
+                  length=length,
+                  label=f'string_literal{global_state.string_literals}',
+                  implementation=implementation)
+    global_state.string_literals += 1
+    return token
+
+
+def create_token_MACRO(operator, value, code_iterator, implementation):
+    name = next(code_iterator)
+    global_state.macros[name] = []
+    token = Token(Operator.MACRO, value=name)
+    return token
+
+
+def create_token_MACRO_EXPANSION(operator, value, code_iterator, implementation):
+    assert value in global_state.macros, f'Unrecognized macro {value}'
+    token = Token(Operator.MACRO_EXPANSION, value=value)
+    return token
+
+
+def create_token_PROCEDURE(operator, value, code_iterator, implementation):
+    name = next(code_iterator)
+    global_state.procedures |= {name}
+    token = Token(Operator.PROCEDURE, value=name, implementation=implementation)
+    return token
+
+
+def operator_to_token(operator, value, code_iterator, implementation):
+    this_module = sys.modules[__name__]
+    create_token = getattr(this_module, 'create_token_' + operator.name, create_token_basic)
+    return create_token(operator, value, code_iterator, implementation)

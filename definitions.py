@@ -1,11 +1,8 @@
 """Type definitions."""
-import sys
 from dataclasses import dataclass, fields
 from enum import Enum, auto
 from typing import Any
 from types import MethodType
-from parsing_utils import string_to_db
-import global_state
 
 
 class Literal(Enum):
@@ -92,79 +89,38 @@ class Token:
     start_token = None
     end_token = None
 
-    # def __new__(cls, *_args, **__kwargs):
-    #     cls.__init = cls.__init__
+    def __new__(cls, *_, **__):
+        obj = super().__new__(cls)
+        obj.__init = cls.__init__
 
-    #     def __init__(self, *args, **kwargs):
-    #         self.__init(*args, **kwargs)
-    #         self._bind_methods()
+        def __init__(self, *args, **kwargs):
+            obj.__init(self, *args, **kwargs)
+            self.bind_methods()
 
-    #     cls.__init__ = __init__
+        cls.__init__ = __init__
 
-    #     obj = super().__new__(cls)
-    #     return obj
+        return obj
 
-    # def _bind_methods(self):
-    #     """
-    #     Bind fields that should be methods but aren't methods yet to this instance.
+    def bind_methods(self):
+        """
+        Bind fields that should be methods but aren't methods yet to this instance.
 
-    #     This method is called right after creating the object.
-    #     If that wasn't the case then we could accomplish the same doing:
-    #         token = Token(...)._bind_methods()
-    #     But luckily it is the case.
-    #     There's no need to call this method more than once.
+        This method is called right after creating the object.
+        If that wasn't the case then we could accomplish the same doing:
+            token = Token(...)._bind_methods()
+        But luckily it is the case.
+        There's no need to call this method more than once.
 
-    #     I know, this is just evil.
-    #     """
-    #     for item in fields(self):
-    #         member = getattr(self, item.name)
-    #         if member is None:
-    #             continue
-    #         if item.type is MethodType and not isinstance(member, MethodType):
-    #             setattr(self, item.name, MethodType(member, self))
-    #     return self
+        I know, this is just evil.
+        """
 
-
-def lexeme_to_operator(lexeme):
-    lexeme_to_operator_dict = {item.value: item for item in Operator}
-    return lexeme_to_operator_dict[lexeme]
-
-
-def create_token_basic(operator, value, code_iterator):
-    return Token(operator, value=value)
-
-def create_token_SWAP(operator, value, code_iterator):
-    return operator_to_token(Operator.ROT2, value, code_iterator)
-
-
-def create_token_PUSH_STRING(operator, value, code_iterator):
-    value, length = string_to_db(value)
-    token = Token(Operator.PUSH_STRING,
-                  value=value,
-                  length=length,
-                  label=f'string_literal{global_state.string_literals}')
-    global_state.string_literals += 1
-    return token
-
-def create_token_MACRO(operator, value, code_iterator):
-    name = next(code_iterator)
-    global_state.macros[name] = []
-    token = Token(Operator.MACRO, value=name)
-    return token
-
-def create_token_MACRO_EXPANSION(operator, value, code_iterator):
-    assert value in global_state.macros, f'Unrecognized macro {value}'
-    token = Token(Operator.MACRO_EXPANSION, value=value)
-    return token
-
-def create_token_PROCEDURE(operator, value, code_iterator):
-    name = next(code_iterator)
-    global_state.procedures |= {name}
-    token = Token(Operator.PROCEDURE, value=name)
-    return token
-
-
-def operator_to_token(operator, value, code_iterator):
-    this_module = sys.modules[__name__]
-    create_token = getattr(this_module, 'create_token_' + operator.name, create_token_basic)
-    return create_token(operator, value, code_iterator)
+        for item in fields(self):
+            member = getattr(self, item.name)
+            if member is None:
+                continue
+            if item.type is MethodType:
+                if not isinstance(member, MethodType):
+                    setattr(self, item.name, MethodType(member, self))
+                elif member.__self__ is not self:
+                    setattr(self, item.name, MethodType(member.__func__, self))
+        return self

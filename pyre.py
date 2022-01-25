@@ -4,7 +4,8 @@ import argparse
 from pathlib import Path
 import subprocess
 from copy import copy
-from definitions import Token, Operator, Literal, Lexeme, lexeme_to_operator, operator_to_token
+from definitions import Token, Operator, Literal, Lexeme
+from implementations import lexeme_to_operator, operator_to_token, get_implementation
 from parsing_utils import pyre_split
 import global_state
 
@@ -59,7 +60,10 @@ def tokenize_line(line_of_code: str) -> list:
         except KeyError:
             raise RuntimeError(f'Unrecognized token {item}')
 
-        token = operator_to_token(operator, value, code_iterator)
+        implementation = get_implementation(operator)
+        token = operator_to_token(operator, value, code_iterator, implementation)
+
+        assert Token is not None
 
         tokens.append(token)
     return tokens
@@ -122,7 +126,7 @@ def expand_macros(program: list) -> list:
 
         if token.operator is Operator.MACRO_EXPANSION:
             expanded_macro = expand_macros(global_state.macros[value])
-            expanded_program.extend([copy(token) for token in expanded_macro])
+            expanded_program.extend([copy(token).bind_methods() for token in expanded_macro])
         elif token.operator is Operator.MACRO:
             raise RuntimeError('The program should not have any remaining macro definitions.')
         else:
@@ -139,6 +143,8 @@ def create_references(program: list) -> list:
 
     for token in program:
         value = token.value
+
+        assert token.operator not in {Operator.MACRO, Operator.MACRO_EXPANSION}
 
         if token.operator is Operator.PROCEDURE:
             # TODO make sure the main procedure appears only once
@@ -196,277 +202,8 @@ def create_references(program: list) -> list:
 
 def generate_instruction(token: Token):
     """Generate assembly for a single token"""
-    value = token.value
+    assembly = token.implementation()
 
-    assembly = []
-
-    # assembly.extend(token.implementation())
-
-    # TODO: Convert to literal or something like that
-    if token.operator is Operator.PUSH_UINT:
-        assembly.append(
-            f'    push    {value}'
-        )
-    elif token.operator is Operator.PUSH_CHAR:
-        assembly.append(
-            f'    push    {value}'
-        )
-    elif token.operator is Operator.PUSH_STRING:
-        assembly.extend([
-            f'    push    {token.label}',
-            f'    push    {token.length}'
-        ])
-        if token not in global_state.add_symbols:
-            global_state.add_symbols.append(token)
-    elif token.operator is Operator.ADD:
-        assembly.extend([
-            '    pop     rax',
-            '    pop     rbx',
-            '    add     rax, rbx',
-            '    push    rax'
-        ])
-    elif token.operator is Operator.SUB:
-        assembly.extend([
-            '    pop     rax',
-            '    pop     rbx',
-            '    sub     rbx, rax',
-            '    push    rbx'
-        ])
-    elif token.operator is Operator.MUL:
-        assembly.extend([
-            '    pop     rax',
-            '    pop     rbx',
-            '    imul     rax, rbx',
-            '    push    rax'
-        ])
-    elif token.operator is Operator.EQUAL:
-        assembly.extend([
-            '    mov     rcx, FALSE',
-            '    mov     rdx, TRUE',
-            '    pop     rax',
-            '    pop     rbx',
-            '    cmp     rax, rbx',
-            '    cmove   rcx, rdx',
-            '    push    rcx'
-        ])
-    elif token.operator is Operator.NOT_EQUAL:
-        assembly.extend([
-            '    mov     rcx, FALSE',
-            '    mov     rdx, TRUE',
-            '    pop     rax',
-            '    pop     rbx',
-            '    cmp     rax, rbx',
-            '    cmovne  rcx, rdx',
-            '    push    rcx'
-        ])
-    elif token.operator is Operator.LESS_THAN:
-        assembly.extend([
-            '    mov     rcx, FALSE',
-            '    mov     rdx, TRUE',
-            '    pop     rax',
-            '    pop     rbx',
-            '    cmp     rbx, rax',
-            '    cmovl   rcx, rdx',
-            '    push    rcx'
-        ])
-    elif token.operator is Operator.LESS_OR_EQUAL_THAN:
-        assembly.extend([
-            '    mov     rcx, FALSE',
-            '    mov     rdx, TRUE',
-            '    pop     rax',
-            '    pop     rbx',
-            '    cmp     rbx, rax',
-            '    cmovle   rcx, rdx',
-            '    push    rcx'
-        ])
-    elif token.operator is Operator.GREATER_THAN:
-        assembly.extend([
-            '    mov     rcx, FALSE',
-            '    mov     rdx, TRUE',
-            '    pop     rax',
-            '    pop     rbx',
-            '    cmp     rbx, rax',
-            '    cmovg   rcx, rdx',
-            '    push    rcx'
-        ])
-    elif token.operator is Operator.GREATER_OR_EQUAL_THAN:
-        assembly.extend([
-            '    mov     rcx, FALSE',
-            '    mov     rdx, TRUE',
-            '    pop     rax',
-            '    pop     rbx',
-            '    cmp     rbx, rax',
-            '    cmovge   rcx, rdx',
-            '    push    rcx'
-        ])
-    elif token.operator is Operator.PEEK:
-        assembly.extend([
-            '    ;; PEEK',
-            '    mov     rdi, [rsp]',
-            '    call    peek',
-        ])
-    elif token.operator is Operator.DROP:
-        assembly.extend([
-            '    pop     rdi'
-        ])
-    elif token.operator is Operator.ROT2:
-        assembly.extend([
-            '    pop     rax',
-            '    pop     rbx',
-            '    push    rax',
-            '    push    rbx',
-        ])
-    elif token.operator is Operator.DROT2:
-        assembly.extend([
-            # a b c d
-            # c d a b
-            '    pop     rdx',
-            '    pop     rcx',
-            '    pop     rbx',
-            '    pop     rax',
-            '    push    rcx',
-            '    push    rdx',
-            '    push    rax',
-            '    push    rbx',
-        ])
-    elif token.operator is Operator.ROT3:
-        assembly.extend([
-            '    pop     rax',
-            '    pop     rbx',
-            '    pop     rcx',
-            '    push    rbx',
-            '    push    rax',
-            '    push    rcx',
-        ])
-    elif token.operator is Operator.PRINT:
-        assembly.extend([
-            '    ;; PRINT',
-            '    pop     rdx',  # the length
-            '    pop     rsi',  # the string
-            '    mov     rdi, STD_OUT',
-            '    mov     rax, SYS_WRITE',
-            '    syscall',
-        ])
-    elif token.operator is Operator.PUTCHAR:
-        assembly.extend([
-            '    ;; PUTCHAR',
-            '    lea     rsi, [rsp]',
-            '    mov     rdi, STD_OUT',
-            '    mov     rdx, 1',
-            '    mov     rax, SYS_WRITE',
-            '    syscall',
-            '    pop     rbx',  # Get rid of the character
-        ])
-    elif token.operator is Operator.DUP:
-        assembly.extend([
-            '    pop     rax',
-            '    push    rax',
-            '    push    rax'
-        ])
-    elif token.operator is Operator.DUP2:
-        assembly.extend([
-            '    pop     rbx',
-            '    pop     rax',
-            '    push    rax',
-            '    push    rbx',
-            '    push    rax',
-            '    push    rbx'
-        ])
-    elif token.operator is Operator.DUP3:
-        assembly.extend([
-            '    pop     rcx',
-            '    pop     rbx',
-            '    pop     rax',
-            '    push    rax',
-            '    push    rbx',
-            '    push    rcx',
-            '    push    rax',
-            '    push    rbx',
-            '    push    rcx',
-        ])
-    elif token.operator is Operator.MEMORY:
-        assembly.extend([
-            '    push    memory',
-        ])
-    elif token.operator is Operator.LOAD:
-        assembly.extend([
-            '    pop    rax',
-            '    mov    rbx, 0',  # Clear rbx
-            '    mov    bl, [rax]',  # Read one byte into rbx
-            '    push   rbx',
-        ])
-    elif token.operator is Operator.STORE:
-        assembly.extend([
-            '    pop    rbx',
-            '    pop    rax',
-            '    mov    [rax], bl',  # Write one byte from rbx
-        ])
-    elif token.operator is Operator.IF:
-        assembly.extend([
-            '    ;; IF',
-            '    pop     rax',
-            '    cmp     rax, TRUE',
-            f'    jne      {token.end_token.label}'
-        ])
-    elif token.operator is Operator.ELSE:
-        assembly.extend([
-            f'    jmp    {token.end_token.label}'
-            '    ;; ELSE',
-            f'{token.label}:'
-        ])
-    elif token.operator is Operator.WHILE:
-        assembly.extend([
-            f'{token.label}:'
-        ])
-    elif token.operator is Operator.DO:
-        assembly.extend([
-            '    ;; DO',
-            '    mov    rcx, TRUE',
-            '    pop    rax',
-            '    cmp    rax, TRUE',
-            f'    jne    {token.end_token.label}'
-        ])
-    elif token.operator is Operator.PROCEDURE_CALL:
-        assembly.extend([
-            f'   ;; CALL {token.value}',
-            f'   call    {token.value}'
-        ])
-    elif token.operator is Operator.PROCEDURE:
-        assembly.extend([
-            f'{token.label}:',
-            '    push    rdi'
-        ])
-    elif token.operator is Operator.END:
-        start_token = token.start_token
-        assert start_token is not None
-
-        if start_token.operator is Operator.IF or start_token.operator is Operator.ELSE:
-            assembly.extend([
-                f'{token.label}:'
-            ])
-        elif start_token.operator is Operator.DO:
-            while_token = start_token.start_token
-            assert while_token is not None
-            assembly.extend([
-                f'    jmp    {while_token.label}',
-                f'{token.label}:'
-            ])
-        elif start_token.operator is Operator.PROCEDURE:
-            if start_token.value == 'main':
-                assembly.extend([
-                    '    ;; EXIT',
-                    '    mov     rdi, 0',  # Set exit code to 0
-                    '    mov     rax, SYS_EXIT',
-                    '    syscall',
-                ])
-            else:
-                assembly.extend([
-                    '    ret',
-                ])
-        else:
-            raise RuntimeError(f'Unrecognized start token {start_token}')
-    else:
-        raise RuntimeError(f'Unrecognized token {token}')
     return '\n'.join(assembly)
 
 
