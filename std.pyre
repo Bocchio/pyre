@@ -8,8 +8,45 @@ macro print  # memory length
     swap STDOUT SYSCALL_WRITE syscall3
 end
 
+# Converts a decimal number into a character
+# 0 to '0'
+# 1 to '1'
+# and so on
+macro num2char  # num
+    48 +
+end
+
 macro putchar  # char
     @ 1 swap STDOUT SYSCALL_WRITE syscall3 drop
+end
+
+macro show_uint  # num
+    dup 0 = if  # If it's 0 just print 0
+        dup num2char putchar
+    else
+        dup
+        0 swap  # digits num
+
+        while dup 0 > do
+            dup 10 %  # last digit
+            swap rot3
+            1 +  # digits++
+            swap
+            10 / # num /= 10
+        end drop
+
+        # ... c b a digits
+        while dup 0 > do
+            swap num2char putchar
+            1 -
+        end drop
+    end
+    drop
+    '\n' putchar
+end
+
+macro peek
+    dup show_uint
 end
 
 macro get_uint8  # i

@@ -20,6 +20,14 @@ def _SUB(self):
         '    sub     rbx, rax',
         '    push    rbx'
     ]
+def _MOD(self):
+    return [
+        '    xor     rdx, rdx',  # Clear rdx
+        '    pop     rbx',
+        '    pop     rax',
+        '    idiv    rbx',
+        '    push    rdx',
+    ]
 def _MUL(self):
     return [
         '    pop     rax',
@@ -27,11 +35,13 @@ def _MUL(self):
         '    imul     rax, rbx',
         '    push    rax'
     ]
-def _PEEK(self):
+def _DIV(self):
     return [
-        '    ;; PEEK',
-        '    mov     rdi, [rsp]',
-        '    call    peek',
+        '    xor     rdx, rdx',  # Clear rdx
+        '    pop     rbx',
+        '    pop     rax',
+        '    idiv    rbx',
+        '    push    rax'
     ]
 def _DROP(self):
     return [

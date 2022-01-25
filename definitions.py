@@ -30,7 +30,8 @@ class Operator(Enum):
     ADD                   = '+'                     # noqa e241
     SUB                   = '-'                     # noqa e241
     MUL                   = '*'                     # noqa e241
-    PEEK                  = 'peek'                  # noqa e241
+    DIV                   = '/'                     # noqa e241
+    MOD                   = '%'                     # noqa e241
     DROP                  = 'drop'                  # noqa e241
     ROT2                  = 'rot2'                  # noqa e241
     SWAP                  = 'swap'                  # noqa e241 same as ROT2
