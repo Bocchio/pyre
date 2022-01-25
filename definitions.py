@@ -42,7 +42,6 @@ class Operator(Enum):
     LOAD                  = 'load'                  # noqa e241
     STORE                 = 'store'                 # noqa e241
     MEMORY                = 'memory'                # noqa e241
-    PRINT                 = 'print'                 # noqa e241
     EQUAL                 = '='                     # noqa e241
     NOT_EQUAL             = '!='                    # noqa e241
     LESS_THAN             = '<'                     # noqa e241

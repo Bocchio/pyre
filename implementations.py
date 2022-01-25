@@ -111,15 +111,6 @@ def _MEMORY(self):
     return [
         '    push    memory',
     ]
-def _PRINT(self):
-    return [
-        '    ;; PRINT',
-        '    pop     rdx',  # the length
-        '    pop     rsi',  # the string
-        '    mov     rdi, STD_OUT',
-        '    mov     rax, SYS_WRITE',
-        '    syscall',
-    ]
 def _EQUAL(self):
     return [
         '    mov     rcx, FALSE',
@@ -253,7 +244,7 @@ def _PROCEDURE_CALL(self):
         f'   call    {self.value}'
     ]
 def _SYSCALL(self):
-    assert 1 <= self.value <= 5
+    assert 0 <= self.value <= 5
     syscall_args = ['rdi', 'rsi', 'rdx', 'r10', 'r8', 'r9']
     arguments = syscall_args[:self.value]
     start = [

@@ -1,5 +1,10 @@
 # Standard library utils
 
+# Prints a string
+macro print  # memory length
+    swap 1 1 syscall3
+end
+
 macro get_item  # i
     memory swap + load  # memory[i]
 end
