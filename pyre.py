@@ -1,91 +1,16 @@
 #!/usr/bin/env python
 """Pyre compiler."""
 import argparse
-from enum import Enum, auto
 from pathlib import Path
 import subprocess
-from dataclasses import dataclass
-from typing import Any
 from copy import copy
+from definitions import Token, Operator, Literal, Lexeme, lexeme_to_operator, operator_to_token
+from parsing_utils import pyre_split
+import global_state
 
 
 MEM_CAPACITY = 1024 * 1024  # 1 MiB I hope that's enough
 PROCEDURE_PREFIX = 'procedure_'
-procedures = set()
-macros = {}
-add_symbols = []
-
-
-class Operator(Enum):
-    """Every operator Pyre knows."""
-
-    ADD = auto()
-    SUB = auto()
-    MUL = auto()
-    PEEK = auto()
-    DROP = auto()
-    ROT2 = auto()
-    DROT2 = auto()
-    ROT3 = auto()
-    DUP = auto()
-    DUP2 = auto()
-    DUP3 = auto()
-    LOAD = auto()
-    STORE = auto()
-    MEMORY = auto()
-    PRINT = auto()
-    EQUAL = auto()
-    NOT_EQUAL = auto()
-    LESS_THAN = auto()
-    GREATER_THAN = auto()
-    LESS_OR_EQUAL_THAN = auto()
-    GREATER_OR_EQUAL_THAN = auto()
-    IF = auto()
-    ELSE = auto()
-    END = auto()
-    WHILE = auto()
-    DO = auto()
-    PUTCHAR = auto()
-    PROCEDURE = auto()
-    PROCEDURE_CALL = auto()
-
-    # Yeah... not exactly pretty
-    PUSH_UINT = auto()
-    PUSH_CHAR = auto()
-    PUSH_STRING = auto()
-
-    MACRO = auto()
-    MACRO_EXPANSION = auto()
-
-    def __repr__(self):
-        return f'{self.__class__.__name__}.{self.name}'
-
-
-# Guess it's unused now
-class Literal(Enum):
-    """Literal types."""
-
-    STRING = auto()
-    CHAR = auto()
-    UINT = auto()
-
-
-@dataclass
-class Token:
-    """A token in the program."""
-    operator: Operator
-    value: Any = None
-
-    # Useful when dealing with strings
-    length: int = None
-
-    # Useful when dealing with block operations
-    block: bool = None
-    address: int = None
-    label: str = None
-
-    start_token = None
-    end_token = None
 
 
 def tokenize(program: str) -> list:
@@ -101,185 +26,47 @@ def tokenize(program: str) -> list:
     return tokens
 
 
-def read_until_sentinel(iterator, sentinel: str) -> str:
-    acc = ''
-    for item in iterator:
-        acc += item
-        if item == sentinel:
-            break
-    return acc
-
-
-def pyre_split(stream: str) -> list:
-    # We add a space at the end to force the last item to be added
-    stream = stream.strip() + ' '
-
-    items = []
-    acc = ''
-    stream_iterator = iter(stream)
-    for c in stream_iterator:
-        if c == '#':
-            break
-        if c == '"' or c == "'":
-            assert acc == ''
-            acc = c + read_until_sentinel(stream_iterator, sentinel=c)
-        elif c.isspace():
-            if acc != '':
-                items.append(acc)
-                acc = ''
-            continue
-        else:
-            acc += c
-    return items
-
-
-def _string_to_db(stream: str) -> list:
-    db_values = []
-    if stream == '':
-        return db_values
-
-    escaped_actual = (
-        (r'\n', ord('\n')),
-        (r'\t', ord('\t'))
-    )
-    for c, val in escaped_actual:
-        if c in stream:
-            a, b = stream.split(c, maxsplit=1)
-            a = _string_to_db(a)
-            b = _string_to_db(b)
-            db_values.extend([*a, val, *b])
-            return db_values
-
-    return [stream]
-
-
-def string_to_db(stream: str) -> str:
-    vals = _string_to_db(stream)
-    vals_quoted = []
-    length = 0
-    for val in vals:
-        if isinstance(val, str):
-            length += len(val)
-            vals_quoted.append(f'"{val}"')
-        else:
-            length += 1
-            vals_quoted.append(str(val))
-    return ','.join(vals_quoted), length
-
-
-string_literals = 0
 def tokenize_line(line_of_code: str) -> list:
     """Convert a line of code into a stream of tokens."""
-    global string_literals, procedures, macros
     tokens = []
     code_iterator = iter(pyre_split(line_of_code))
     for item in code_iterator:
         # TODO add support for floats
+
+        value = None
         if item.isnumeric():
             value = int(item)
-            item = Operator.PUSH_UINT
+            lexeme = Literal.UINT
         elif item.startswith("'") and item.endswith("'"):
             item = bytes(item, 'ascii').decode('unicode_escape')
             assert len(item) == 3, 'Expected item enclosed by single quotes to be a single character.'
             value = ord(item[1])
-            item = Operator.PUSH_CHAR
+            lexeme = Literal.CHAR
         elif item.startswith('"') and item.endswith('"'):
             value = item[1:-1]
-            item = Operator.PUSH_STRING
-        elif item in procedures:
+            lexeme = Literal.STRING
+        elif item in global_state.procedures:
             value = f'{PROCEDURE_PREFIX}{item}'
-            item = Operator.PROCEDURE_CALL
-        elif item in macros:
+            lexeme = Lexeme.PROCEDURE_CALL
+        elif item in global_state.macros:
             value = item
-            item = Operator.MACRO_EXPANSION
-
-        if item == '+':
-            token = Token(Operator.ADD)
-        elif item == '-':
-            token = Token(Operator.SUB)
-        elif item == '*':
-            token = Token(Operator.MUL)
-        elif item == 'peek':
-            token = Token(Operator.PEEK)
-        elif item == 'drop':
-            token = Token(Operator.DROP)
-        elif item == 'rot2' or item == 'swap':
-            token = Token(Operator.ROT2)
-        elif item == 'drot2':
-            token = Token(Operator.DROT2)
-        elif item == 'rot3':
-            token = Token(Operator.ROT3)
-        elif item == 'print':
-            token = Token(Operator.PRINT)
-        elif item == 'putchar':
-            token = Token(Operator.PUTCHAR)
-        elif item == '=':
-            token = Token(Operator.EQUAL)
-        elif item == '!=':
-            token = Token(Operator.NOT_EQUAL)
-        elif item == '<':
-            token = Token(Operator.LESS_THAN)
-        elif item == '>':
-            token = Token(Operator.GREATER_THAN)
-        elif item == '<=':
-            token = Token(Operator.LESS_OR_EQUAL_THAN)
-        elif item == '>=':
-            token = Token(Operator.GREATER_OR_EQUAL_THAN)
-        elif item == 'dup':
-            token = Token(Operator.DUP)
-        elif item == '2dup':
-            token = Token(Operator.DUP2)
-        elif item == '3dup':
-            token = Token(Operator.DUP3)
-        elif item == 'load':
-            token = Token(Operator.LOAD)
-        elif item == 'store':
-            token = Token(Operator.STORE)
-        elif item == 'memory':
-            token = Token(Operator.MEMORY)
-        elif item == 'if':
-            token = Token(Operator.IF)
-        elif item == 'else':
-            token = Token(Operator.ELSE)
-        elif item == 'while':
-            token = Token(Operator.WHILE)
-        elif item == 'do':
-            token = Token(Operator.DO)
-        elif item == 'procedure':
-            name = next(code_iterator)
-            procedures |= {name}
-            token = Token(Operator.PROCEDURE, value=name)
-        elif item == 'end':
-            token = Token(Operator.END)
-        elif item == Operator.PUSH_UINT:
-            token = Token(Operator.PUSH_UINT, value=value)
-        elif item == Operator.PUSH_CHAR:
-            token = Token(Operator.PUSH_CHAR, value=value)
-        elif item == Operator.PUSH_STRING:
-            value, length = string_to_db(value)
-            token = Token(Operator.PUSH_STRING,
-                          value=value,
-                          length=length,
-                          label=f'string_literal{string_literals}')
-            string_literals += 1
-        elif item == Operator.PROCEDURE_CALL:
-            token = Token(Operator.PROCEDURE_CALL, value=value)
-        elif item == 'macro':
-            name = next(code_iterator)
-            macros[name] = []
-            token = Token(Operator.MACRO, value=name)
-        elif item == Operator.MACRO_EXPANSION:
-            assert value in macros, f'Unrecognized macro {value}'
-            token = Token(Operator.MACRO_EXPANSION, value=value)
+            lexeme = Lexeme.MACRO_EXPANSION
         else:
+            lexeme = item
+
+        try:
+            operator = lexeme_to_operator(lexeme)
+        except KeyError:
             raise RuntimeError(f'Unrecognized token {item}')
+
+        token = operator_to_token(operator, value, code_iterator)
+
         tokens.append(token)
     return tokens
 
 
 def load_macros(program: list) -> list:
     """Load the macros in the program."""
-    global macros
     resulting_program = []
     stack = []
 
@@ -321,21 +108,20 @@ def load_macros(program: list) -> list:
             in_macro_end = False
         elif token.operator is not Operator.MACRO:
             assert current_macro is not None
-            macros[current_macro].append(token)
+            global_state.macros[current_macro].append(token)
 
     return resulting_program
 
 
 def expand_macros(program: list) -> list:
     """Expand the macros in the program."""
-    global macros
     expanded_program = []
 
     for token in program:
         value = token.value
 
         if token.operator is Operator.MACRO_EXPANSION:
-            expanded_macro = expand_macros(macros[value])
+            expanded_macro = expand_macros(global_state.macros[value])
             expanded_program.extend([copy(token) for token in expanded_macro])
         elif token.operator is Operator.MACRO:
             raise RuntimeError('The program should not have any remaining macro definitions.')
@@ -410,10 +196,11 @@ def create_references(program: list) -> list:
 
 def generate_instruction(token: Token):
     """Generate assembly for a single token"""
-    global add_symbols
     value = token.value
 
     assembly = []
+
+    # assembly.extend(token.implementation())
 
     # TODO: Convert to literal or something like that
     if token.operator is Operator.PUSH_UINT:
@@ -429,8 +216,8 @@ def generate_instruction(token: Token):
             f'    push    {token.label}',
             f'    push    {token.length}'
         ])
-        if token not in add_symbols:
-            add_symbols.append(token)
+        if token not in global_state.add_symbols:
+            global_state.add_symbols.append(token)
     elif token.operator is Operator.ADD:
         assembly.extend([
             '    pop     rax',
@@ -685,8 +472,6 @@ def generate_instruction(token: Token):
 
 def generate_assembly(program: list):
     """Generate assembly for a Pyre program."""
-    global add_symbols
-
     assembly = [
         r'%define SYS_EXIT 60',
         r'%define SYS_WRITE 1',
@@ -738,11 +523,11 @@ def generate_assembly(program: list):
         '    ret',
         '',
     ]
-    add_symbols = []
+    global_state.add_symbols = []
     for token in program:
         assembly.append(generate_instruction(token))
 
-    for token in add_symbols:
+    for token in global_state.add_symbols:
         assembly.extend([
             '',
             f'{token.label}:',
