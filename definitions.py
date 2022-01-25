@@ -53,9 +53,10 @@ class Operator(Enum):
     END                   = 'end'                   # noqa e241
     WHILE                 = 'while'                 # noqa e241
     DO                    = 'do'                    # noqa e241
-    PUTCHAR               = 'putchar'               # noqa e241
     PROCEDURE             = 'procedure'             # noqa e241
     PROCEDURE_CALL        = Lexeme.PROCEDURE_CALL   # noqa e241
+
+    STACK_DEREFERENCE     = '@'                     # noqa e241
 
     IMPORT                = 'import'                # noqa e241
 

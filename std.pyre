@@ -8,6 +8,10 @@ macro print  # memory length
     swap STDOUT SYSCALL_WRITE syscall3
 end
 
+macro putchar  # char
+    @ 1 swap STDOUT SYSCALL_WRITE syscall3 drop
+end
+
 macro get_uint8  # i
     memory swap + load  # memory[i]
 end

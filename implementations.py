@@ -223,15 +223,9 @@ def _DO(self):
         '    cmp    rax, TRUE',
         f'    jne    {self.end_token.label}'
     ]
-def _PUTCHAR(self):
+def _STACK_DEREFERENCE(self):
     return [
-        '    ;; PUTCHAR',
-        '    lea     rsi, [rsp]',
-        '    mov     rdi, STD_OUT',
-        '    mov     rdx, 1',
-        '    mov     rax, SYS_WRITE',
-        '    syscall',
-        '    pop     rbx',  # Get rid of the character
+        '    push    rsp',
     ]
 def _PROCEDURE(self):
     return [
