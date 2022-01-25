@@ -58,6 +58,8 @@ class Operator(Enum):
     PROCEDURE             = 'procedure'             # noqa e241
     PROCEDURE_CALL        = Lexeme.PROCEDURE_CALL   # noqa e241
 
+    SYSCALL               = 'syscall'               # noqa e241
+
     PUSH_UINT             = Literal.UINT            # noqa e241
     PUSH_CHAR             = Literal.CHAR            # noqa e241
     PUSH_STRING           = Literal.STRING          # noqa e241

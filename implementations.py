@@ -225,8 +225,6 @@ def _WHILE(self):
         f'{self.label}:'
     ]
 def _DO(self):
-    print(self)
-    print(id(self))
     return [
         '    ;; DO',
         '    mov    rcx, TRUE',
@@ -254,6 +252,19 @@ def _PROCEDURE_CALL(self):
         f'   ;; CALL {self.value}',
         f'   call    {self.value}'
     ]
+def _SYSCALL(self):
+    assert 1 <= self.value <= 5
+    syscall_args = ['rdi', 'rsi', 'rdx', 'r10', 'r8', 'r9']
+    arguments = syscall_args[:self.value]
+    start = [
+        '    ;; SYSCALL',
+        '    pop rax',
+    ]
+    middle = [f'    pop {arg}' for arg in arguments]
+    end = [
+        '    syscall'
+    ]
+    return start + middle + end
 def _PUSH_UINT(self):
     return [
         f'    push    {self.value}'

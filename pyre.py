@@ -52,6 +52,9 @@ def tokenize_line(line_of_code: str) -> list:
         elif item in global_state.macros:
             value = item
             lexeme = Lexeme.MACRO_EXPANSION
+        elif item.startswith('syscall') and len(item) == 8:
+            value = int(item[-1])
+            lexeme = 'syscall'
         else:
             lexeme = item
 
