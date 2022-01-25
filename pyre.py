@@ -6,7 +6,7 @@ import subprocess
 from copy import copy
 from definitions import Token, Operator, Literal, Lexeme
 from implementations import lexeme_to_operator, operator_to_token, get_implementation
-from parsing_utils import pyre_split
+from parsing_utils import pyre_split, remove_comments
 import global_state
 
 
@@ -16,21 +16,10 @@ PROCEDURE_PREFIX = 'procedure_'
 
 def tokenize(program: str) -> list:
     """Convert the program into a stream of tokens."""
+    program = remove_comments(program)
     tokens = []
-    for line in program.split('\n'):
-        tokens.extend(tokenize_line(line))
 
-    # Inject the address in each token
-    for i, token in enumerate(tokens):
-        token.addr = i
-
-    return tokens
-
-
-def tokenize_line(line_of_code: str) -> list:
-    """Convert a line of code into a stream of tokens."""
-    tokens = []
-    code_iterator = iter(pyre_split(line_of_code))
+    code_iterator = iter(pyre_split(program))
     for item in code_iterator:
         # TODO add support for floats
 
@@ -55,6 +44,19 @@ def tokenize_line(line_of_code: str) -> list:
         elif item.startswith('syscall') and len(item) == 8:
             value = int(item[-1])
             lexeme = 'syscall'
+        elif item == 'import':
+            # Now this is the funny part
+            # We can edit the iterator, getting the operators this function
+            filename = next(code_iterator)
+            assert filename.startswith('"')
+            assert filename.endswith('"')
+            filename = filename[1:-1] + '.pyre'
+            if filename not in global_state.imports:  # Nothing should be imported more than once
+                with open(filename, 'r') as imported_library:
+                    imported_code = imported_library.read()
+                tokens.extend(tokenize(imported_code))
+                global_state.imports.append(filename)
+            continue
         else:
             lexeme = item
 
@@ -69,6 +71,12 @@ def tokenize_line(line_of_code: str) -> list:
         assert Token is not None
 
         tokens.append(token)
+
+    # Inject the address in each token
+    # Now this is not needed anymore
+    for i, token in enumerate(tokens):
+        token.address = i
+
     return tokens
 
 

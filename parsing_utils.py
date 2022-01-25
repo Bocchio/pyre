@@ -44,16 +44,31 @@ def read_until_sentinel(iterator, sentinel: str) -> str:
     return acc
 
 
+def remove_comments(stream: str) -> str:
+    """
+    Remove comments from a stream of code.
+
+    Not the prettiest of solutions but it'll do
+    """
+
+    def remove_comment_from_line(line):
+        return line.split('#', maxsplit=1)[0]
+
+    uncommented_lines = map(remove_comment_from_line, stream.split('\n'))
+    uncommented_code = '\n'.join(uncommented_lines)
+    return uncommented_code
+
+
 def pyre_split(stream: str) -> list:
+    """Get a list of lexemes from a stream of code."""
     # We add a space at the end to force the last item to be added
+    # Modern problems require modern solutions
     stream = stream.strip() + ' '
 
     items = []
     acc = ''
     stream_iterator = iter(stream)
     for c in stream_iterator:
-        if c == '#':
-            break
         if c == '"' or c == "'":
             assert acc == ''
             acc = c + read_until_sentinel(stream_iterator, sentinel=c)

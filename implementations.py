@@ -284,6 +284,8 @@ def _MACRO(self):
     raise RuntimeError('Macro operator reached assembly code')
 def _MACRO_EXPANSION(self):
     raise RuntimeError('Macro expansion operator reached assembly code')
+def _IMPORT(self):
+    raise RuntimeError('Import operator reached assembly code')
 
 
 def operator_to_implementation(operator):
@@ -325,6 +327,13 @@ def create_token_MACRO(operator, value, code_iterator, implementation):
     name = next(code_iterator)
     global_state.macros[name] = []
     token = Token(Operator.MACRO, value=name)
+    return token
+
+
+def create_token_IMPORT(operator, value, code_iterator, implementation):
+    filename = next(code_iterator)
+    global_state.imports[filename] = []
+    token = Token(Operator.MACRO, value=filename)
     return token
 
 

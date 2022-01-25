@@ -1,0 +1,41 @@
+# Standard library utils
+
+macro get_item  # i
+    memory swap + load  # memory[i]
+end
+
+macro set_item  # i -- value
+    memory rot3 +  # value -- memory + i
+    swap store  # memory[i] <- value
+end
+
+macro set_mem  # c a b
+    while 2dup < do
+        # b c a
+        rot3 rot3 2dup swap set_item
+        # c (a+1) b
+        1 + rot3
+    end
+end
+
+macro copy_mem  # dest source len
+    # d s l
+    2dup + swap drop
+    # d s L s L
+    while 2dup < do
+        rot3 rot3           # L d s
+        dup get_item        # L d s [s]
+        rot3 dup rot3       # L s d d [s]
+        set_item            # L s d
+        1 + swap 1 + rot3   # (d+1) (s+1) L
+    end drop drop drop
+end
+
+macro print_mem  # a b
+    while 2dup < do
+        swap # b a
+        dup get_item 48 + putchar  # print 48 + [a]
+        1 + swap
+    end drop drop
+    '\n' putchar
+end
