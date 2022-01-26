@@ -36,7 +36,7 @@ class TestBaseStructures(unittest.TestCase):
             tests = yaml.safe_load(f.read())
 
         for test_name, test in tests.items():
-            code = test['code']
+            code = 'import "std"\n' + test['code']
             expected_output = test['expected']
             output = run_code(code)
             self.assertEqual(output, expected_output, f'Failed test {test_name}')
@@ -47,7 +47,7 @@ class TestBaseStructures(unittest.TestCase):
             tests = yaml.safe_load(f.read())
 
         for test_name, test in tests.items():
-            code = test['code']
+            code = 'import "std"\n' + test['code']
             expected_output = test['expected']
             output = run_code(code)
             self.assertEqual(output, expected_output, f'Failed test {test_name}')

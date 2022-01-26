@@ -42,27 +42,29 @@ define LINES 40
 
 
 procedure main
-    "Let's do some rule 110 stuff \n" print
-    # Value Start                 End
-          0     0 MAX_BUFFER_SIZE 2 *   set_mem
+    # "Let's do some rule 110 stuff \n" print
+    # # Value Start                 End
+    #       0     0 MAX_BUFFER_SIZE 2 *   set_mem
 
-    LENGTH 1 - 1 set_uint8
+    # LENGTH 1 - 1 set_uint8
 
-    macro print_line
-        1 while dup LENGTH < do dup get_uint8 print_num 1 + end drop '\n' putchar
-    end
+    # macro print_line
+    #     1 while dup LENGTH < do dup get_uint8 print_num 1 + end drop '\n' putchar
+    # end
 
-    print_line
-    1 while dup LINES < do
-        1 while dup LENGTH < do
-            dup get_110 rule110         # i value
-            swap dup MAX_BUFFER_SIZE +  # value i index
-            rot3 set_uint8              # i index value set_uint8
-            1 +
-        end drop
-        0 MAX_BUFFER_SIZE LENGTH copy_mem
-        print_line
-        1 +
-    end drop
+    # print_line
+    # 1 while dup LINES < do
+    #     1 while dup LENGTH < do
+    #         dup get_110 rule110         # i value
+    #         swap dup MAX_BUFFER_SIZE +  # value i index
+    #         rot3 set_uint8              # i index value set_uint8
+    #         1 +
+    #     end drop
+    #     0 MAX_BUFFER_SIZE LENGTH copy_mem
+    #     print_line
+    #     1 +
+    # end drop
+
+    257 show_uint
 
 end

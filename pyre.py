@@ -11,7 +11,10 @@ import global_state
 
 
 MEM_CAPACITY = 1024 * 1024  # 1 MiB I hope that's enough
+SYMBOLS_TABLE_SIZE = 512  # 64 symbols of 8 bytes each
 PROCEDURE_PREFIX = 'procedure_'
+
+# TODO make sure I don't redefine constants
 
 
 def tokenize(program: str) -> list:
@@ -22,6 +25,8 @@ def tokenize(program: str) -> list:
     code_iterator = iter(pyre_split(program))
     for item in code_iterator:
         # TODO add support for floats
+
+        known_names = [operator.value for operator in Operator] + [*global_state.macros]
 
         value = None
         if item.isnumeric():
@@ -44,7 +49,7 @@ def tokenize(program: str) -> list:
         elif item.startswith('syscall') and len(item) == 8:
             value = int(item[-1])
             lexeme = 'syscall'
-        elif item == 'import':
+        elif item == Operator.IMPORT.value:
             # Now this is the funny part
             # We can edit the iterator, getting the operators this function
             filename = next(code_iterator)
@@ -57,12 +62,19 @@ def tokenize(program: str) -> list:
                 tokens.extend(tokenize(imported_code))
                 global_state.imports.append(filename)
             continue
-        elif item == 'define':
+        elif item == Operator.DEFINE.value:
             name = next(code_iterator)
             value = next(code_iterator)
             macro_code = f'macro {name} {value} end'
             tokens.extend(tokenize(macro_code))
             continue
+        elif item.startswith('!') and item not in known_names:
+            # Not enough information to set the location here
+            value = item[1:]  # global_state.symbols.index(item) * 8
+            lexeme = Lexeme.MUTATE
+        elif item not in known_names:
+            value = item
+            lexeme = Lexeme.VARIABLE
         else:
             lexeme = item
 
@@ -105,13 +117,16 @@ def load_macros(program: list) -> list:
             stack.append(token)  # Needs an end
         elif token.operator is Operator.DO:
             stack.append(token)  # Needs an end
+        elif token.operator is Operator.WHERE:
+            stack.append(token)  # Needs an end
         elif token.operator is Operator.END:
             start_token = stack.pop()
             assert start_token.operator in {Operator.IF,
                                             Operator.ELSE,
                                             Operator.DO,
                                             Operator.PROCEDURE,
-                                            Operator.MACRO}
+                                            Operator.MACRO,
+                                            Operator.WHERE}
             if start_token.operator is Operator.MACRO:
                 in_macro_end = True
         elif token.operator is Operator.MACRO:
@@ -158,8 +173,13 @@ def create_references(program: list) -> list:
     stack = []
     block = 1
 
+    variables = []
+
     for token in program:
         value = token.value
+
+        if token.operator is Operator.RETRIEVE:
+            assert token.value in variables, f'Unexpeted variable {token.value}'
 
         assert token.operator not in {Operator.MACRO, Operator.MACRO_EXPANSION}
 
@@ -199,6 +219,9 @@ def create_references(program: list) -> list:
             token.start_token = start_token
 
             stack.append(token)  # Needs an end
+        elif token.operator is Operator.WHERE:
+            variables.extend(token.value)
+            stack.append(token)  # Needs an end
         elif token.operator is Operator.END:
             token.label = f'end{block}'
             block += 1
@@ -207,7 +230,12 @@ def create_references(program: list) -> list:
             assert start_token.operator in {Operator.IF,
                                             Operator.ELSE,
                                             Operator.DO,
-                                            Operator.PROCEDURE}
+                                            Operator.PROCEDURE,
+                                            Operator.WHERE}
+
+            if start_token.operator is Operator.WHERE:
+                for variable in start_token.value:
+                    variables.pop()
 
             token.start_token = start_token
             start_token.end_token = token
@@ -236,6 +264,7 @@ def generate_assembly(program: list):
 
         'segment .bss',
         f'memory:   resb {MEM_CAPACITY}',
+        f'symbols:   resb {SYMBOLS_TABLE_SIZE}',
 
         'segment .text',
     ]

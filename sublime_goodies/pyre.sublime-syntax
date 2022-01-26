@@ -26,13 +26,19 @@ contexts:
     # strings in YAML. When using single quoted strings, only single quotes
     # need to be escaped: this is done by using two single quotes next to each
     # other.
-    - match: '\b(if|else|end|while|do|procedure|macro)\b'
+    - match: '\b(if|else|end|while|do|in|where|procedure|macro)\b'
       scope: keyword.control.pyre
-    - match: '\b(memory|load|store|dup|2dup|3dup|peek|rot3|rot2|drot2|swap|drop|putchar|print)\b'
+    - match: '\b(memory|load|store|syscall0|syscall1|syscall2|syscall3|syscall4|syscall5)\b'
+      scope: keyword.primitives.pyre
+    - match: '\b(dup|2dup|3dup|rot3|rot2|drot2|swap|drop)\b'
+      scope: keyword.primitives.pyre
+    - match: '\b(import|define)\b'
+      scope: keyword.primitives.pyre
+    - match: '\b(peek|putchar|print)\b'
       scope: keyword.primitives.pyre
 
   operators:
-    - match: '\+|\-|\*|\=|\<|\>|\!'
+    - match: '\+|\-|\*|\/|\%|\=|\<|\>|\!|\@'
       scope: constant.operator.pyre
 
   numbers:

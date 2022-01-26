@@ -4,6 +4,7 @@ import sys
 import global_state
 from definitions import Token, Operator
 from parsing_utils import string_to_db
+from itertools import count
 
 
 def _ADD(self):
@@ -117,6 +118,36 @@ def _STORE(self):
         '    pop    rax',
         '    mov    [rax], bl',  # Write one byte from rbx
     ]
+def _WHERE(self):
+    # TODO this can be way more efficient
+    start_location = len(global_state.symbols)
+    global_state.symbols.extend(self.value)
+    inst = [';; WHERE']
+    variables = self.value
+    for i, item in enumerate(variables):
+        stack_location = i * 8
+        location = start_location + i * 8
+        inst.extend([
+            '  mov     rax, rsp',
+            f'  add     rax, {stack_location}',
+            f'  mov     [symbols + {location}], rax'
+        ])
+    return inst
+def _RETRIEVE(self):
+    location = global_state.symbols.index(self.value) * 8
+    return [
+        f';; RETRIEVE {self.value}',
+        f'   mov     rbx, [symbols + {location}]',
+        '    mov     rax, [rbx]',
+        '   push     rax',
+    ]
+def _MUTATE(self):
+    location = global_state.symbols.index(self.value) * 8
+    return [
+        f';; MUTATE {self.value}',
+         '   pop     rax',
+        f'   mov     [rsp + {location}], rax'
+    ]
 def _MEMORY(self):
     return [
         '    push    memory',
@@ -209,6 +240,10 @@ def _END(self):
             f'    jmp    {while_token.label}',
             f'{self.label}:'
         ]
+    elif start_token.operator is Operator.WHERE:
+        for variable in start_token.value:
+            global_state.symbols.pop()
+        return []
     elif start_token.operator is Operator.PROCEDURE:
         if start_token.value == 'main':
             return [
@@ -262,16 +297,19 @@ def _SYSCALL(self):
     return start + middle + end
 def _PUSH_UINT(self):
     return [
+        f'    ;; _PUSH_UINT ',
         f'    push    {self.value}'
     ]
 def _PUSH_CHAR(self):
     return [
+        f'    ;; _PUSH_CHAR ',
         f'    push    {self.value}'
     ]
 def _PUSH_STRING(self):
     if self not in global_state.add_symbols:
         global_state.add_symbols.append(self)
     return [
+        f'    ;; _PUSH_STRING ',
         f'    push    {self.label}',
         f'    push    {self.length}'
     ]
@@ -349,8 +387,18 @@ def create_token_PROCEDURE(operator, value, code_iterator, implementation):
     token = Token(Operator.PROCEDURE, value=name, implementation=implementation)
     return token
 
+def create_token_WHERE(operator, value, code_iterator, implementation):
+    variables = []
+    for variable in code_iterator:
+        if variable == 'in':
+            break
+        variables.append(variable)
+
+    variables = variables[::-1]
+    return Token(operator, value=variables, implementation=implementation)
 
 def operator_to_token(operator, value, code_iterator, implementation):
     this_module = sys.modules[__name__]
     create_token = getattr(this_module, 'create_token_' + operator.name, create_token_basic)
     return create_token(operator, value, code_iterator, implementation)
+

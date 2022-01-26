@@ -22,6 +22,8 @@ class Lexeme(Enum):
 
     MACRO_EXPANSION = auto()
     PROCEDURE_CALL = auto()
+    VARIABLE = auto()
+    MUTATE = auto()
 
 
 class Operator(Enum):
@@ -56,6 +58,11 @@ class Operator(Enum):
     DO                    = 'do'                    # noqa e241
     PROCEDURE             = 'procedure'             # noqa e241
     PROCEDURE_CALL        = Lexeme.PROCEDURE_CALL   # noqa e241
+
+    WHERE                 = 'where'                 # noqa e241
+    IN                    = 'in'                    # noqa e241
+    RETRIEVE              = Lexeme.VARIABLE         # noqa e241
+    MUTATE                = Lexeme.MUTATE           # noqa e241
 
     STACK_DEREFERENCE     = '@'                     # noqa e241
 
