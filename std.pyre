@@ -4,8 +4,8 @@ define STDOUT 1
 define SYSCALL_WRITE 1
 
 # Prints a string
-macro print  # memory length
-    swap STDOUT SYSCALL_WRITE syscall3
+macro print  # length memory
+    STDOUT SYSCALL_WRITE syscall3
 end
 
 # Converts a decimal number into a character
@@ -16,32 +16,71 @@ macro num2char  # num
     48 +
 end
 
+macro strlen  # memory
+    0  # length
+    where address length in
+        while address 0 != do
+            address 1 + !address
+            length 1 + !length
+        end
+    end
+end
+
 macro putchar  # char
     @ 1 swap STDOUT SYSCALL_WRITE syscall3 drop
 end
 
-macro show_uint  # num
-    dup 0 = if  # If it's 0 just print 0
-        dup num2char putchar
-    else
-        dup
-        0 swap  # digits num
-
-        while dup 0 > do
-            dup 10 %  # last digit
-            swap rot3
-            1 +  # digits++
-            swap
-            10 / # num /= 10
-        end drop
-
-        # ... c b a digits
-        while dup 0 > do
-            swap num2char putchar
-            1 -
-        end drop
+macro strcmp
+# length1 string1 length2 string2
+    0  # i
+    where l1 s1 l2 s2 i in
+        l1 l2 != if
+            drop drop drop drop drop
+            0  # False
+        else
+            1 where are_equal in
+            while
+                s1 i + [] putchar
+                '\n' putchar
+                s2 i + [] putchar
+                '\n' putchar
+                i num2char putchar
+                '\n' putchar
+                '\n' putchar
+                s1 i + [] 0 !=
+                s2 i + [] 0 != *
+                are_equal *
+            do
+                s1 i + []
+                s2 i + [] = !are_equal
+                i 1 + !i
+            end
+            are_equal !l1
+            end
+            drop drop drop drop drop
+        end
     end
-    drop
+end
+
+macro show_uint  # num
+    0  # digits
+    where num digits in
+    num 0 = if  # If it's 0 just print 0
+        num num2char putchar
+    else
+        while num 0 > do
+            num 10 %  # last digit
+            digits 1 + !digits # digits++
+            num 10 / !num # num /= 10
+        end
+        # ... c b a digits
+        while digits 0 > do
+            num2char putchar
+            digits 1 - !digits
+        end
+    end
+    end
+    drop drop
     '\n' putchar
 end
 

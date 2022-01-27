@@ -4,7 +4,7 @@ test1:
             1 while dup 10 <= do
                 peek
                 1 +
-            end
+            end drop
         end
     expected: |
         1
@@ -23,7 +23,7 @@ test2:
             0 while dup 10 < do
                 peek
                 2 +
-            end
+            end drop
         end
     expected: |
         0
@@ -37,7 +37,7 @@ test3:
             5 while dup 0 != do
                 1 peek drop
                 1 -
-            end
+            end drop
         end
     expected: |
         1
@@ -56,7 +56,7 @@ test3:
                 dup 9 = if 1 + end
                 dup peek drop
                 1 +
-            end
+            end drop
         end
     expected: |
         2

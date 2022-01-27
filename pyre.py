@@ -7,11 +7,15 @@ from copy import copy
 from definitions import Token, Operator, Literal, Lexeme
 from implementations import lexeme_to_operator, operator_to_token, get_implementation
 from parsing_utils import pyre_split, remove_comments
+from grammar_checking import check_push_count
 import global_state
 
 
 MEM_CAPACITY = 1024 * 1024  # 1 MiB I hope that's enough
+SYMBOLS_TABLE_SIZE = 512  # 64 symbols of 8 bytes each
 PROCEDURE_PREFIX = 'procedure_'
+
+# TODO make sure I don't redefine constants
 
 
 def tokenize(program: str) -> list:
@@ -23,6 +27,7 @@ def tokenize(program: str) -> list:
     for item in code_iterator:
         # TODO add support for floats
 
+        known_names = [operator.value for operator in Operator] + [*global_state.macros]
         value = None
         if item.isnumeric():
             value = int(item)
@@ -44,7 +49,9 @@ def tokenize(program: str) -> list:
         elif item.startswith('syscall') and len(item) == 8:
             value = int(item[-1])
             lexeme = 'syscall'
-        elif item == 'import':
+        elif item == Operator.IMPORT.value:
+            # This is special we don't want a lexeme
+            # We want to execute something right away
             # Now this is the funny part
             # We can edit the iterator, getting the operators this function
             filename = next(code_iterator)
@@ -57,12 +64,28 @@ def tokenize(program: str) -> list:
                 tokens.extend(tokenize(imported_code))
                 global_state.imports.append(filename)
             continue
-        elif item == 'define':
+        elif item == Operator.DEFINE.value:
             name = next(code_iterator)
             value = next(code_iterator)
             macro_code = f'macro {name} {value} end'
             tokens.extend(tokenize(macro_code))
             continue
+        elif item.startswith('!') and item not in known_names:
+            value = item[1:]
+            lexeme = Lexeme.MUTATE
+        elif item.endswith(']') and item not in known_names:
+            item = item[:-1]
+            address, value = item.split('[', maxsplit=1)
+            value = value if value != '' else 0
+            tokens.extend(tokenize(f'{address} {value} +'))
+            lexeme = Lexeme.DEREFERENCE
+        elif item.endswith('++') and item not in known_names:
+            value = item[:-2]
+            tokens.extend(tokenize(f'{value} 1 +'))
+            lexeme = Lexeme.MUTATE
+        elif item not in known_names:
+            value = item
+            lexeme = Lexeme.VARIABLE
         else:
             lexeme = item
 
@@ -105,13 +128,16 @@ def load_macros(program: list) -> list:
             stack.append(token)  # Needs an end
         elif token.operator is Operator.DO:
             stack.append(token)  # Needs an end
+        elif token.operator is Operator.WHERE:
+            stack.append(token)  # Needs an end
         elif token.operator is Operator.END:
             start_token = stack.pop()
             assert start_token.operator in {Operator.IF,
                                             Operator.ELSE,
                                             Operator.DO,
                                             Operator.PROCEDURE,
-                                            Operator.MACRO}
+                                            Operator.MACRO,
+                                            Operator.WHERE}
             if start_token.operator is Operator.MACRO:
                 in_macro_end = True
         elif token.operator is Operator.MACRO:
@@ -158,8 +184,13 @@ def create_references(program: list) -> list:
     stack = []
     block = 1
 
+    variables = []
+
     for token in program:
         value = token.value
+
+        if token.operator is Operator.RETRIEVE:
+            assert token.value in variables, f'Unexpeted variable {token.value}'
 
         assert token.operator not in {Operator.MACRO, Operator.MACRO_EXPANSION}
 
@@ -199,6 +230,9 @@ def create_references(program: list) -> list:
             token.start_token = start_token
 
             stack.append(token)  # Needs an end
+        elif token.operator is Operator.WHERE:
+            variables.extend(token.value)
+            stack.append(token)  # Needs an end
         elif token.operator is Operator.END:
             token.label = f'end{block}'
             block += 1
@@ -207,7 +241,12 @@ def create_references(program: list) -> list:
             assert start_token.operator in {Operator.IF,
                                             Operator.ELSE,
                                             Operator.DO,
-                                            Operator.PROCEDURE}
+                                            Operator.PROCEDURE,
+                                            Operator.WHERE}
+
+            if start_token.operator is Operator.WHERE:
+                for variable in start_token.value:
+                    variables.pop()
 
             token.start_token = start_token
             start_token.end_token = token
@@ -236,8 +275,47 @@ def generate_assembly(program: list):
 
         'segment .bss',
         f'memory:   resb {MEM_CAPACITY}',
+        f'symbols:   resb {SYMBOLS_TABLE_SIZE}',
 
         'segment .text',
+
+        # Print unsigned integer routine
+        # It's not like I stole this piece of code from gcc -O3 or something like that
+        '',
+        'peek:',
+        '    mov     r9, -3689348814741910323',
+        '    sub     rsp, 40',
+        '    mov     BYTE [rsp+31], 10',
+        '    lea     rcx, [rsp+30]',
+        '.L2:',
+        '    mov     rax, rdi',
+        '    lea     r8, [rsp+32]',
+        '    mul     r9',
+        '    mov     rax, rdi',
+        '    sub     r8, rcx',
+        '    shr     rdx, 3',
+        '    lea     rsi, [rdx+rdx*4]',
+        '    add     rsi, rsi',
+        '    sub     rax, rsi',
+        '    add     eax, 48',
+        '    mov     BYTE [rcx], al',
+        '    mov     rax, rdi',
+        '    mov     rdi, rdx',
+        '    mov     rdx, rcx',
+        '    sub     rcx, 1',
+        '    cmp     rax, 9',
+        '    ja      .L2',
+        '    lea     rax, [rsp+32]',
+        '    mov     edi, 1',
+        '    sub     rdx, rax',
+        '    xor     eax, eax',
+        '    lea     rsi, [rsp+32+rdx]',
+        '    mov     rdx, r8',
+        '    mov     rax, SYS_WRITE',
+        '    syscall',
+        '    add     rsp, 40',
+        '    ret',
+        '',
     ]
     global_state.add_symbols = []
     for token in program:
@@ -257,7 +335,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Simple Pyre compiler.')
     parser.add_argument('source', nargs='+',
                         help='source files')
-    # TODO make this mutually exclusive with sim
     parser.add_argument('-r',
                         '--run',
                         action='store_true',
@@ -274,6 +351,8 @@ if __name__ == '__main__':
     tokens = load_macros(tokens)
     tokens = expand_macros(tokens)
     program = create_references(tokens)
+
+    check_push_count(program)
 
     # The real work
     assembly = generate_assembly(program)

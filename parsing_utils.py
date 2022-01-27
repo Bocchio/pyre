@@ -32,7 +32,7 @@ def string_to_db(stream: str) -> str:
         else:
             length += 1
             vals_quoted.append(str(val))
-    return ','.join(vals_quoted), length
+    return ','.join(vals_quoted) + ', 0', length + 1
 
 
 def read_until_sentinel(iterator, sentinel: str) -> str:

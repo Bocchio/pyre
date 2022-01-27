@@ -6,6 +6,10 @@ from definitions import Token, Operator
 from parsing_utils import string_to_db
 
 
+def rindex(list, value):  # Yeah, I'm shadowing list because that's how I roll
+    return len(list) - list[::-1].index(value) - 1
+
+
 def _ADD(self):
     return [
         '    pop     rax',
@@ -117,6 +121,61 @@ def _STORE(self):
         '    pop    rax',
         '    mov    [rax], bl',  # Write one byte from rbx
     ]
+def _WHERE(self):
+    # TODO this can be way more efficient
+    start_location = len(global_state.symbols)
+    global_state.symbols.extend(self.value)
+    inst = [';; WHERE']
+    variables = self.value
+    for i, item in enumerate(variables):
+        length = len(variables) - 1
+        stack_location = (length - i) * 8
+        location = (start_location + i) * 8
+        inst.extend([
+            '  mov     rax, rsp',
+            f'  add     rax, {stack_location}',
+            f'  mov     [symbols + {location}], rax'
+        ])
+    # print()
+    return inst
+def _RETRIEVE(self):
+    i = rindex(global_state.symbols, self.value)
+    location = i * 8
+    return [
+        f';; RETRIEVE {self.value}',
+        f'   mov     rbx, [symbols + {location}]',
+        '    mov     rax, [rbx]',
+        '   push     rax',
+    ]
+
+def _HARDPEEK(self):
+    return [
+        '    ;; PEEK',
+        '    mov     rdi, [rsp]',
+        '    call    peek',
+        # '    mov     rdi, [rsp + 8]',
+        # '    call    peek',
+        # '    mov     rdi, [rsp + 16]',
+        # '    call    peek',
+        # '    mov     rdi, [rsp + 24]',
+        # '    call    peek',
+    ]
+def _MUTATE(self):
+    location = rindex(global_state.symbols, self.value) * 8
+    return [
+        f';; MUTATE {self.value}',
+        f'   mov     rbx, [symbols + {location}]',
+         '   pop     rax',
+        f'   mov     [rbx], rax',
+        '   xor     rax, rax',
+    ]
+def _DEREFERENCE(self):
+    return [
+        ';; DEREFERENCE',
+        '   pop     rax',
+        '   mov     rbx, [rax]',
+        '   push    rbx',
+    ]
 def _MEMORY(self):
     return [
         '    push    memory',
@@ -209,6 +268,10 @@ def _END(self):
             f'    jmp    {while_token.label}',
             f'{self.label}:'
         ]
+    elif start_token.operator is Operator.WHERE:
+        for variable in start_token.value:
+            global_state.symbols.pop()
+        return []
     elif start_token.operator is Operator.PROCEDURE:
         if start_token.value == 'main':
             return [
@@ -233,7 +296,7 @@ def _DO(self):
         '    cmp    rax, TRUE',
         f'    jne    {self.end_token.label}'
     ]
-def _STACK_DEREFERENCE(self):
+def _STACK_REFERENCE(self):
     return [
         '    push    rsp',
     ]
@@ -262,18 +325,21 @@ def _SYSCALL(self):
     return start + middle + end
 def _PUSH_UINT(self):
     return [
+        f'    ;; _PUSH_UINT ',
         f'    push    {self.value}'
     ]
 def _PUSH_CHAR(self):
     return [
+        f'    ;; _PUSH_CHAR ',
         f'    push    {self.value}'
     ]
 def _PUSH_STRING(self):
     if self not in global_state.add_symbols:
         global_state.add_symbols.append(self)
     return [
-        f'    push    {self.label}',
-        f'    push    {self.length}'
+        f'    ;; _PUSH_STRING ',
+        f'    push    {self.length}',
+        f'    push    {self.label}'
     ]
 
 
@@ -349,8 +415,17 @@ def create_token_PROCEDURE(operator, value, code_iterator, implementation):
     token = Token(Operator.PROCEDURE, value=name, implementation=implementation)
     return token
 
+def create_token_WHERE(operator, value, code_iterator, implementation):
+    variables = []
+    for variable in code_iterator:
+        if variable == 'in':
+            break
+        variables.append(variable)
+
+    return Token(operator, value=variables, implementation=implementation)
 
 def operator_to_token(operator, value, code_iterator, implementation):
     this_module = sys.modules[__name__]
     create_token = getattr(this_module, 'create_token_' + operator.name, create_token_basic)
     return create_token(operator, value, code_iterator, implementation)
+

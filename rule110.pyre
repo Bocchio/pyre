@@ -64,5 +64,4 @@ procedure main
         print_line
         1 +
     end drop
-
 end
