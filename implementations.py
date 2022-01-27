@@ -121,32 +121,60 @@ def _STORE(self):
 def _WHERE(self):
     # TODO this can be way more efficient
     start_location = len(global_state.symbols)
+    print("where")
     global_state.symbols.extend(self.value)
+    print(global_state.symbols)
+    print(self.value)
     inst = [';; WHERE']
     variables = self.value
     for i, item in enumerate(variables):
-        stack_location = i * 8
-        location = start_location + i * 8
+        thing = len(variables) - 1
+        stack_location = (thing - i) * 8
+        location = (start_location + i) * 8
+        print(f"{item=}, {stack_location=}, {location=}")
         inst.extend([
             '  mov     rax, rsp',
             f'  add     rax, {stack_location}',
             f'  mov     [symbols + {location}], rax'
         ])
+    print()
     return inst
 def _RETRIEVE(self):
-    location = global_state.symbols.index(self.value) * 8
+    l = len(global_state.symbols) - 1
+    i = global_state.symbols.index(self.value)
+    location = i * 8
+    print()
+    print("retrieve")
+    print(global_state.symbols)
+    print(f"{self.value=} {location=}")
+    print()
     return [
         f';; RETRIEVE {self.value}',
         f'   mov     rbx, [symbols + {location}]',
         '    mov     rax, [rbx]',
         '   push     rax',
     ]
+def _HARDPEEK(self):
+    return [
+        '    ;; PEEK',
+        '    mov     rdi, [rsp]',
+        '    call    peek',
+        # '    mov     rdi, [rsp + 8]',
+        # '    call    peek',
+        # '    mov     rdi, [rsp + 16]',
+        # '    call    peek',
+        # '    mov     rdi, [rsp + 24]',
+        # '    call    peek',
+    ]
 def _MUTATE(self):
     location = global_state.symbols.index(self.value) * 8
+    print(global_state.symbols)
     return [
         f';; MUTATE {self.value}',
+        f'   mov     rbx, [symbols + {location}]',
          '   pop     rax',
-        f'   mov     [rsp + {location}], rax'
+        f'   mov     [rbx], rax',
+        '   xor     rax, rax',
     ]
 def _MEMORY(self):
     return [
@@ -394,7 +422,6 @@ def create_token_WHERE(operator, value, code_iterator, implementation):
             break
         variables.append(variable)
 
-    variables = variables[::-1]
     return Token(operator, value=variables, implementation=implementation)
 
 def operator_to_token(operator, value, code_iterator, implementation):

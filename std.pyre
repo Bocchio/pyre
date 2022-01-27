@@ -21,27 +21,24 @@ macro putchar  # char
 end
 
 macro show_uint  # num
-    dup 0 = if  # If it's 0 just print 0
-        dup num2char putchar
+    0  # digits
+    where num digits in
+    num 0 = if  # If it's 0 just print 0
+        num num2char putchar
     else
-        dup
-        0 swap  # digits num
-
-        while dup 0 > do
-            dup 10 %  # last digit
-            swap rot3
-            1 +  # digits++
-            swap
-            10 / # num /= 10
-        end drop
-
+        while num 0 > do
+            num 10 %  # last digit
+            digits 1 + !digits # digits++
+            num 10 / !num # num /= 10
+        end
         # ... c b a digits
-        while dup 0 > do
-            swap num2char putchar
-            1 -
-        end drop
+        while digits 0 > do
+            num2char putchar
+            digits 1 - !digits
+        end
     end
-    drop
+    end
+    drop drop
     '\n' putchar
 end
 
