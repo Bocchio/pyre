@@ -10,28 +10,39 @@ macro print_num  # num
 end
 
 macro rule110  # lcr
-         dup 000 = if 0   # 000 -> 0
-    else dup 001 = if 1   # 001 -> 1
-    else dup 010 = if 1   # 010 -> 1
-    else dup 011 = if 1   # 011 -> 1
-    else dup 100 = if 0   # 100 -> 0
-    else dup 101 = if 1   # 101 -> 1
-    else dup 110 = if 1   # 110 -> 1
-    else dup 111 = if 0   # 111 -> 0
+    0 swap
+    where res lcr in
+         dup 000 = if 0 !res  # 000 -> 0
+    else dup 001 = if 1 !res  # 001 -> 1
+    else dup 010 = if 1 !res  # 010 -> 1
+    else dup 011 = if 1 !res  # 011 -> 1
+    else dup 100 = if 0 !res  # 100 -> 0
+    else dup 101 = if 1 !res  # 101 -> 1
+    else dup 110 = if 1 !res  # 110 -> 1
+    else dup 111 = if 0 !res  # 111 -> 0
     end end end end end end end end
-    swap drop
+    end
+    drop
 end
 
 macro to_dec  # a b c
-    swap 10 *   # a c (10 * b)
-    rot3 100 *  # c (10 * b) (100 * a)
-    + +         # 100a + 10b + c
+    where a b c in
+        a 100 *
+        b 10 *
+        c + +
+        !a
+    end drop drop
 end
 
 macro get_110   # i
-    dup dup  # i i i
-    1 - rot3 rot3 1 +  # (i-1) i (i+1)
-    get_uint8 rot3 get_uint8 rot3 get_uint8 rot3  # [i-1] [i] [i+1]
+    dup dup
+    where i j k in
+        i--
+        k++
+        i get_uint8 !i
+        j get_uint8 !j
+        k get_uint8 !k
+    end
     to_dec
 end
 
@@ -49,19 +60,37 @@ procedure main
     LENGTH 1 - 1 set_uint8
 
     macro print_line
-        1 while dup LENGTH < do dup get_uint8 print_num 1 + end drop '\n' putchar
+        1
+        where c in
+        while c LENGTH < do
+            c get_uint8 print_num
+            c++
+            end
+        end drop
+        '\n' putchar
     end
 
+
     print_line
-    1 while dup LINES < do
-        1 while dup LENGTH < do
-            dup get_110 rule110         # i value
-            swap dup MAX_BUFFER_SIZE +  # value i index
-            rot3 set_uint8              # i index value set_uint8
-            1 +
-        end drop
+    1 1
+    where line cell in
+        while line LINES < do
+        while cell LENGTH < do
+                cell MAX_BUFFER_SIZE +  # index
+                cell get_110 rule110    # value
+                set_uint8               # i index value set_uint8
+            cell++
+        end 0 !cell
+
         0 MAX_BUFFER_SIZE LENGTH copy_mem
         print_line
-        1 +
-    end drop
+
+        + 1
+
+        line++
+    end
+    end
+    drop drop
+
+    drop drop drop
 end

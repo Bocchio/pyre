@@ -1,0 +1,18 @@
+import "std"
+
+procedure main
+    define numbers_to_show 20
+
+    0 1 # First numbers of the fibonacci sequence
+    0   # A counter
+    where n1 n2 i in
+        while i numbers_to_show < do
+            n1 show_uint
+            n1 n2 + # push n1 + n2 onto the stack
+            n2 !n1  # n1 ← n2
+               !n2  # n2 ← n1 + n2
+            i++
+        end
+    end
+    drop drop drop
+end

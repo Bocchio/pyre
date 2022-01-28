@@ -123,7 +123,7 @@ stack_effect = {
     Operator.STACK_REFERENCE            :  1,     # noqae 241
     Operator.DEREFERENCE                :  0,     # noqae 241
     Operator.IMPORT                     :  0,     # noqae 241
-    Operator.SYSCALL                    : None,   # noqae 241
+    Operator.SYSCALL                    :  1,   # noqae 241
     Operator.PUSH_UINT                  :  1,     # noqae 241
     Operator.PUSH_CHAR                  :  1,     # noqae 241
     Operator.PUSH_STRING                :  2,     # noqae 241

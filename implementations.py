@@ -278,7 +278,7 @@ def _END(self):
                 '    ;; EXIT',
                 '    mov     rdi, 0',  # Set exit code to 0
                 '    mov     rax, SYS_EXIT',
-                '    syscall',
+                '    syscall'
             ]
         else:
             return [
@@ -320,7 +320,8 @@ def _SYSCALL(self):
     ]
     middle = [f'    pop {arg}' for arg in arguments]
     end = [
-        '    syscall'
+        '    syscall',
+        '    push    rax'
     ]
     return start + middle + end
 def _PUSH_UINT(self):

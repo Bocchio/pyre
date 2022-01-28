@@ -83,6 +83,32 @@ def tokenize(program: str) -> list:
             value = item[:-2]
             tokens.extend(tokenize(f'{value} 1 +'))
             lexeme = Lexeme.MUTATE
+        elif item.endswith('--') and item not in known_names:
+            value = item[:-2]
+            tokens.extend(tokenize(f'{value} 1 -'))
+            lexeme = Lexeme.MUTATE
+        elif item == 'for':
+            setup = []
+            condition = []
+            action = []
+            for item in code_iterator:
+                if item == ';':
+                    break
+                setup.append(item)
+            for item in code_iterator:
+                if item == ';':
+                    break
+                condition.append(item)
+            for item in code_iterator:
+                if item == 'do':
+                    break
+                action.append(item)
+
+            code = ' '.join(setup) + ' while ' + ' '.join(condition) + ' do '
+
+            value = item[:-2]
+            tokens.extend(tokenize(f'{value} 1 +'))
+            lexeme = Lexeme.MUTATE
         elif item not in known_names:
             value = item
             lexeme = Lexeme.VARIABLE

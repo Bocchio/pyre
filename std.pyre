@@ -1,12 +1,41 @@
 # Standard library utils
 
+import "fcntl"
+
 define STDOUT 1
-define SYSCALL_WRITE 1
+define SYSCALL_READ         0
+define SYSCALL_WRITE        1
+define SYSCALL_OPEN         2
+define SYSCALL_CLOSE        3
 
 # Prints a string
 macro print  # length memory
     STDOUT SYSCALL_WRITE syscall3
 end
+
+macro write  # length memory fd
+    SYSCALL_WRITE syscall3
+end
+
+# Open a file
+macro open
+    where filename in
+    0 O_WRONLY filename SYSCALL_OPEN syscall3
+    end
+end
+
+# Read a file
+macro read
+    SYSCALL_READ syscall3
+end
+
+# Close a file
+macro close
+    where file_descriptor in
+        file_descriptor SYSCALL_CLOSE syscall1
+    end
+end
+
 
 # Converts a decimal number into a character
 # 0 to '0'
