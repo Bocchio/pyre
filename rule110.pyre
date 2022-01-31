@@ -1,49 +1,43 @@
 import "std"
 
-macro print_num  # num
+procedure print_num num -- in
     ' ' putchar
-    1 = if
+    if num 1 = do
         '*' putchar
     else
         ' ' putchar
     end
 end
 
-macro rule110  # lcr
-    0 swap
-    where res lcr in
-         dup 000 = if 0 !res  # 000 -> 0
-    else dup 001 = if 1 !res  # 001 -> 1
-    else dup 010 = if 1 !res  # 010 -> 1
-    else dup 011 = if 1 !res  # 011 -> 1
-    else dup 100 = if 0 !res  # 100 -> 0
-    else dup 101 = if 1 !res  # 101 -> 1
-    else dup 110 = if 1 !res  # 110 -> 1
-    else dup 111 = if 0 !res  # 111 -> 0
-    end end end end end end end end
+procedure rule110 lcr -- res in
+    if   lcr 000 = do 0 !res  # 000 -> 0
+    elif lcr 001 = do 1 !res  # 001 -> 1
+    elif lcr 010 = do 1 !res  # 010 -> 1
+    elif lcr 011 = do 1 !res  # 011 -> 1
+    elif lcr 100 = do 0 !res  # 100 -> 0
+    elif lcr 101 = do 1 !res  # 101 -> 1
+    elif lcr 110 = do 1 !res  # 110 -> 1
+    elif lcr 111 = do 0 !res  # 111 -> 0
     end
-    drop
 end
 
-macro to_dec  # a b c
-    where a b c in
-        a 100 *
-        b 10 *
-        c + +
-        !a
-    end drop drop
+procedure to_dec a b c -- res in
+    a 100 *
+    b 10 *
+    c + +
+    !res
 end
 
-macro get_110   # i
-    dup dup
+procedure get_110 position -- res in
+    position position position
     where i j k in
         i--
         k++
-        i get_uint8 !i
-        j get_uint8 !j
-        k get_uint8 !k
+        memory[i] !i
+        memory[j] !j
+        memory[k] !k
     end
-    to_dec
+    to_dec !res
 end
 
 # Constants
@@ -51,46 +45,41 @@ define LENGTH 40
 define MAX_BUFFER_SIZE 500
 define LINES 40
 
-
-procedure main
-    "Let's do some rule 110 stuff \n" print
-    # Value Start                 End
-          0     0 MAX_BUFFER_SIZE 2 *   set_mem
-
-    LENGTH 1 - 1 set_uint8
-
-    macro print_line
-        1
-        where c in
+procedure print_line -- in
+    1
+    where c in
         while c LENGTH < do
-            c get_uint8 print_num
+            memory:uint8[c] print_num
             c++
-            end
-        end drop
-        '\n' putchar
-    end
+        end
+    end drop
+    '\n' putchar
+end
 
+procedure main -- in
+    "Let's do some rule 110 stuff \n" print
+
+    # (0, 0, MAX_BUFFER_SIZE 2 *) set_mem
+
+
+    0 0 MAX_BUFFER_SIZE 2 * set_mem
+
+    1 !memory:uint8[LENGTH 1 -]
 
     print_line
     1 1
     where line cell in
         while line LINES < do
-        while cell LENGTH < do
-                cell MAX_BUFFER_SIZE +  # index
-                cell get_110 rule110    # value
-                set_uint8               # i index value set_uint8
-            cell++
-        end 0 !cell
-
-        0 MAX_BUFFER_SIZE LENGTH copy_mem
-        print_line
-
-        + 1
-
-        line++
-    end
+            1 !cell
+            while cell LENGTH < do
+                cell get_110 rule110 !memory:uint8[cell MAX_BUFFER_SIZE +]
+                cell++
+            end
+            0 MAX_BUFFER_SIZE LENGTH copy_mem
+            print_line
+            line++
+        end
     end
     drop drop
 
-    drop drop drop
 end

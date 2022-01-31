@@ -9,8 +9,8 @@ define SYSCALL_OPEN         2
 define SYSCALL_CLOSE        3
 
 # Prints a string
-macro print  # length memory
-    STDOUT SYSCALL_WRITE syscall3
+procedure print length address -- in
+    length address STDOUT SYSCALL_WRITE syscall3 drop
 end
 
 macro write  # length memory fd
@@ -55,61 +55,66 @@ macro strlen  # memory
     end
 end
 
-macro putchar  # char
-    @ 1 swap STDOUT SYSCALL_WRITE syscall3 drop
+procedure putchar char -- in
+    @ 1 swap STDOUT SYSCALL_WRITE syscall3
+    drop  # drop syscall result
 end
 
-macro strcmp
-# length1 string1 length2 string2
-    0  # i
-    where l1 s1 l2 s2 i in
-        l1 l2 != if
-            drop drop drop drop drop
-            0  # False
-        else
-            1 where are_equal in
-            while
-                s1 i + [] putchar
-                '\n' putchar
-                s2 i + [] putchar
-                '\n' putchar
-                i num2char putchar
-                '\n' putchar
-                '\n' putchar
-                s1 i + [] 0 !=
-                s2 i + [] 0 != *
-                are_equal *
-            do
-                s1 i + []
-                s2 i + [] = !are_equal
-                i 1 + !i
-            end
-            are_equal !l1
-            end
-            drop drop drop drop drop
-        end
-    end
-end
+# macro strcmp
+# # length1 string1 length2 string2
+#     0  # i
+#     where l1 s1 l2 s2 i in
+#         l1 l2 != if
+#             drop drop drop drop drop
+#             0  # False
+#         else
+#             1 where are_equal in
+#             while
+#                 s1 i + [] putchar
+#                 '\n' putchar
+#                 s2 i + [] putchar
+#                 '\n' putchar
+#                 i num2char putchar
+#                 '\n' putchar
+#                 '\n' putchar
+#                 s1 i + [] 0 !=
+#                 s2 i + [] 0 != *
+#                 are_equal *
+#             do
+#                 s1 i + []
+#                 s2 i + [] = !are_equal
+#                 i 1 + !i
+#             end
+#             are_equal !l1
+#             end
+#             drop drop drop drop drop
+#         end
+#     end
+# end
 
-macro show_uint  # num
+procedure show_uint num -- in
     0  # digits
-    where num digits in
-    num 0 = if  # If it's 0 just print 0
-        num num2char putchar
-    else
-        while num 0 > do
-            num 10 %  # last digit
-            digits 1 + !digits # digits++
-            num 10 / !num # num /= 10
-        end
-        # ... c b a digits
-        while digits 0 > do
-            num2char putchar
-            digits 1 - !digits
+    where digits in
+        if num 0 = do  # If it's 0 just print 0
+            num num2char putchar
+        else
+            while num 0 > do
+                num 10 %  # last digit
+                digits++
+                num 10 / !num # num /= 10
+            end
+            # ... c b a digits
+            while digits 0 > do
+                num2char putchar
+                digits--
+            end
         end
     end
-    end
-    drop drop
+    drop
+    # '\n' putchar
+end
+
+macro endl
     '\n' putchar
 end
 
@@ -117,42 +122,29 @@ macro peek
     dup show_uint
 end
 
-macro get_uint8  # i
-    memory swap + load  # memory[i]
-end
 
-macro set_uint8  # i -- value
-    memory rot3 +  # value -- memory + i
-    swap store  # memory[i] <- value
-end
-
-macro set_mem  # c a b
-    while 2dup < do
-        # b c a
-        rot3 rot3 2dup swap set_uint8
-        # c (a+1) b
-        1 + rot3
+procedure set_mem c a b -- in
+    while a b < do
+        c !memory:uint8[a]
+        a++
     end
 end
 
-macro copy_mem  # dest source len
-    # d s l
-    2dup + swap drop
-    # d s L s L
-    while 2dup < do
-        rot3 rot3           # L d s
-        dup get_uint8       # L d s [s]
-        rot3 dup rot3       # L s d d [s]
-        set_uint8           # L s d
-        1 + swap 1 + rot3   # (d+1) (s+1) L
-    end drop drop drop
+
+procedure copy_mem dest start stop -- in
+    2dup + swap drop  # Replace len with source + len
+    while start stop < do
+        memory:uint8[start] !memory:uint8[dest]
+        start++
+        dest++
+    end
 end
 
-macro print_mem  # a b
-    while 2dup < do
-        swap # b a
-        dup get_uint8 48 + putchar  # print 48 + [a]
-        1 + swap
-    end drop drop
+
+procedure print_mem a b -- in
+    while a b < do
+        memory:uint8[a] num2char putchar
+        a++
+    end
     '\n' putchar
 end

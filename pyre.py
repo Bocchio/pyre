@@ -4,18 +4,21 @@ import argparse
 from pathlib import Path
 import subprocess
 from copy import copy
-from definitions import Token, Operator, Literal, Lexeme
-from implementations import lexeme_to_operator, operator_to_token, get_implementation
+from definitions import Token, Operator, lexeme_matches, get_type_size, PROCEDURE_PREFIX
+from definitions import get_load_instruction, get_store_instruction
+from implementations import operator_to_token, get_implementation
 from parsing_utils import pyre_split, remove_comments
 from grammar_checking import check_push_count
+from pprint import pprint
 import global_state
 
 
 MEM_CAPACITY = 1024 * 1024  # 1 MiB I hope that's enough
 SYMBOLS_TABLE_SIZE = 512  # 64 symbols of 8 bytes each
-PROCEDURE_PREFIX = 'procedure_'
 
 # TODO make sure I don't redefine constants
+
+# TODO tag macro expansions so we know where they start and end
 
 
 def tokenize(program: str) -> list:
@@ -27,29 +30,12 @@ def tokenize(program: str) -> list:
     for item in code_iterator:
         # TODO add support for floats
 
-        known_names = [operator.value for operator in Operator] + [*global_state.macros]
-        value = None
-        if item.isnumeric():
-            value = int(item)
-            lexeme = Literal.UINT
-        elif item.startswith("'") and item.endswith("'"):
-            item = bytes(item, 'ascii').decode('unicode_escape')
-            assert len(item) == 3, 'Expected item enclosed by single quotes to be a single character.'
-            value = ord(item[1])
-            lexeme = Literal.CHAR
-        elif item.startswith('"') and item.endswith('"'):
-            value = item[1:-1]
-            lexeme = Literal.STRING
-        elif item in global_state.procedures:
-            value = f'{PROCEDURE_PREFIX}{item}'
-            lexeme = Lexeme.PROCEDURE_CALL
-        elif item in global_state.macros:
-            value = item
-            lexeme = Lexeme.MACRO_EXPANSION
-        elif item.startswith('syscall') and len(item) == 8:
-            value = int(item[-1])
-            lexeme = 'syscall'
-        elif item == Operator.IMPORT.value:
+        value = item
+        operator = lexeme_matches(item)
+
+        # Here we handle tokens that are instructions to the lexer and not the
+        # program
+        if operator is Operator.IMPORT:
             # This is special we don't want a lexeme
             # We want to execute something right away
             # Now this is the funny part
@@ -64,65 +50,49 @@ def tokenize(program: str) -> list:
                 tokens.extend(tokenize(imported_code))
                 global_state.imports.append(filename)
             continue
-        elif item == Operator.DEFINE.value:
+        elif operator is Operator.DEFINE:
             name = next(code_iterator)
             value = next(code_iterator)
             macro_code = f'macro {name} {value} end'
             tokens.extend(tokenize(macro_code))
             continue
-        elif item.startswith('!') and item not in known_names:
-            value = item[1:]
-            lexeme = Lexeme.MUTATE
-        elif item.endswith(']') and item not in known_names:
-            item = item[:-1]
-            address, value = item.split('[', maxsplit=1)
+        elif operator is Operator.AUTOINCREMENT:
+            value = item[:-2]
+            tokens.extend(tokenize(f'{value} 1 + !{value}'))
+            continue
+        elif operator is Operator.AUTODECREMENT:
+            value = item[:-2]
+            tokens.extend(tokenize(f'{value} 1 - !{value}'))
+            continue
+        elif operator is Operator.WRITE_TO:
+            match = operator.value.fullmatch(item)
+
+            address, type_annotation, value = match.groups()
+
+            type_annotation = type_annotation if type_annotation is not None else '1'
             value = value if value != '' else 0
-            tokens.extend(tokenize(f'{address} {value} +'))
-            lexeme = Lexeme.DEREFERENCE
-        elif item.endswith('++') and item not in known_names:
-            value = item[:-2]
-            tokens.extend(tokenize(f'{value} 1 +'))
-            lexeme = Lexeme.MUTATE
-        elif item.endswith('--') and item not in known_names:
-            value = item[:-2]
-            tokens.extend(tokenize(f'{value} 1 -'))
-            lexeme = Lexeme.MUTATE
-        elif item == 'for':
-            setup = []
-            condition = []
-            action = []
-            for item in code_iterator:
-                if item == ';':
-                    break
-                setup.append(item)
-            for item in code_iterator:
-                if item == ';':
-                    break
-                condition.append(item)
-            for item in code_iterator:
-                if item == 'do':
-                    break
-                action.append(item)
+            value *= get_type_size(type_annotation)
 
-            code = ' '.join(setup) + ' while ' + ' '.join(condition) + ' do '
+            store_instruction = get_store_instruction(type_annotation)
 
-            value = item[:-2]
-            tokens.extend(tokenize(f'{value} 1 +'))
-            lexeme = Lexeme.MUTATE
-        elif item not in known_names:
-            value = item
-            lexeme = Lexeme.VARIABLE
-        else:
-            lexeme = item
+            tokens.extend(tokenize(f'{address} {value} + {store_instruction}'))
+            continue
+        elif operator is Operator.DEREFERENCE:
+            match = operator.value.fullmatch(item)
 
-        try:
-            operator = lexeme_to_operator(lexeme)
-        except KeyError:
-            raise RuntimeError(f'Unrecognized token {item}')
+            address, type_annotation, value = match.groups()
+
+            type_annotation = type_annotation if type_annotation is not None else '1'
+            value = value if value != '' else 0
+            value *= get_type_size(type_annotation)
+            load_instruction = get_load_instruction(type_annotation)
+
+            tokens.extend(tokenize(f'{address} {value} + {load_instruction}'))
+
+            continue
 
         implementation = get_implementation(operator)
         token = operator_to_token(operator, value, code_iterator, implementation)
-
         assert Token is not None
 
         tokens.append(token)
@@ -145,20 +115,37 @@ def load_macros(program: list) -> list:
     in_macro_end = False
     token_iterator = iter(program)  # Welp, sometimes you gotta do what you gotta do
     for token in token_iterator:
+
         if token.operator is Operator.PROCEDURE:
+            # print(f'start token {token.operator.name}')
             stack.append(token)  # Needs an end
         elif token.operator is Operator.IF:
+            # print(f'start token {token.operator.name}')
             stack.append(token)  # Needs an else or an end
         elif token.operator is Operator.ELSE:
-            stack.pop()
+            start_token = stack.pop()
+            # print(f'end   token {start_token.operator.name}')
+            # print()
+            # print(f'start token {token.operator.name}')
             stack.append(token)  # Needs an end
+        elif token.operator is Operator.WHILE:
+            # print(f'start token {token.operator.name}')
+            stack.append(token)  # Needs a do
         elif token.operator is Operator.DO:
+            start_token = stack.pop()
+            # print(f'end   token {start_token.operator.name}')
+            # print()
+            # print(f'start token {token.operator.name}')
             stack.append(token)  # Needs an end
         elif token.operator is Operator.WHERE:
+            # print(f'start token {token.operator.name}')
             stack.append(token)  # Needs an end
         elif token.operator is Operator.END:
             start_token = stack.pop()
+            # print(f'end   token {start_token.operator.name}')
+            # print()
             assert start_token.operator in {Operator.IF,
+                                            Operator.ELIF,
                                             Operator.ELSE,
                                             Operator.DO,
                                             Operator.PROCEDURE,
@@ -171,6 +158,7 @@ def load_macros(program: list) -> list:
             current_macro = token.value
             in_macro = True
 
+            # print(f'start token {token.operator.name}')
             stack.append(token)  # Needs an end
 
         if not in_macro:
@@ -229,12 +217,26 @@ def create_references(program: list) -> list:
             token.block = block
             block += 1
 
+            input_variables, return_variable = global_state.procedure_to_variables[token.value]
+            all_variables = input_variables + return_variable
+            variables.extend(all_variables)
             stack.append(token)  # Needs an end
         elif token.operator is Operator.IF:
-            stack.append(token)  # Needs an else or an end
+            stack.append(token)  # Needs a do
         elif token.operator is Operator.WHILE:
             token.label = f'while{block}'
             block += 1
+
+            stack.append(token)  # Needs a do
+        elif token.operator is Operator.ELIF:
+            token.label = f'elif{block}'
+            block += 1
+
+            start_token = stack.pop()
+            assert start_token.operator is Operator.DO
+
+            token.start_token = start_token
+            start_token.end_token = token
 
             stack.append(token)  # Needs a do
         elif token.operator is Operator.ELSE:
@@ -242,7 +244,7 @@ def create_references(program: list) -> list:
             block += 1
 
             start_token = stack.pop()
-            assert start_token.operator is Operator.IF
+            assert start_token.operator is Operator.DO
 
             token.start_token = start_token
             start_token.end_token = token
@@ -250,29 +252,57 @@ def create_references(program: list) -> list:
             stack.append(token)  # Needs an end
         elif token.operator is Operator.DO:
             start_token = stack.pop()
-            assert start_token.operator is Operator.WHILE
+            assert start_token.operator in {Operator.WHILE,
+                                            Operator.IF,
+                                            Operator.ELIF}
+
+            start_token.end_token = token
 
             # We'll propagate this to the end
             token.start_token = start_token
 
-            stack.append(token)  # Needs an end
+            stack.append(token)  # Needs an end an elif or an else
         elif token.operator is Operator.WHERE:
             variables.extend(token.value)
             stack.append(token)  # Needs an end
         elif token.operator is Operator.END:
+            # FIXME add the type of block it ends to the label
             token.label = f'end{block}'
             block += 1
 
             start_token = stack.pop()
-            assert start_token.operator in {Operator.IF,
-                                            Operator.ELSE,
+            assert start_token.operator in {Operator.ELSE,
                                             Operator.DO,
                                             Operator.PROCEDURE,
                                             Operator.WHERE}
 
+            # FIXME: This is really ugly.
+            #        I think it's better to keep track of the block type inside
+            #        the token itself
+            if_block = start_token.operator is Operator.DO and start_token.start_token.operator in {Operator.IF, Operator.ELIF}
+            if_block = if_block or start_token.operator is Operator.ELSE
+
             if start_token.operator is Operator.WHERE:
                 for variable in start_token.value:
                     variables.pop()
+            elif start_token.operator is Operator.PROCEDURE:
+                input_variables, return_variable = global_state.procedure_to_variables[start_token.value]
+                all_variables = input_variables + return_variable
+                for variable in all_variables:
+                    variables.pop()
+            elif if_block:
+                # TODO: Make this prettier
+                st = start_token
+                while True:
+                    assert st.operator in {Operator.IF,
+                                           Operator.ELIF,
+                                           Operator.DO,
+                                           Operator.ELSE}
+                    if st.operator in {Operator.ELIF, Operator.ELSE}:
+                        st.end_token = token
+                    if st.operator is Operator.IF:
+                        break
+                    st = st.start_token
 
             token.start_token = start_token
             start_token.end_token = token
@@ -343,9 +373,20 @@ def generate_assembly(program: list):
         '    ret',
         '',
     ]
+
+    def tag_instructions(instructions, name):
+        lines = instructions.split('\n')
+        tag_position = 29
+        padding = max(0, tag_position - len(lines[0])) * ' '
+        lines[0] += f'{padding} ;; {name}'
+
+        return '\n'.join(lines)
+
     global_state.add_symbols = []
     for token in program:
-        assembly.append(generate_instruction(token))
+        instructions = generate_instruction(token)
+        instructions = tag_instructions(instructions, token.operator.name)
+        assembly.append(instructions)
 
     for token in global_state.add_symbols:
         assembly.extend([
@@ -378,7 +419,9 @@ if __name__ == '__main__':
     tokens = expand_macros(tokens)
     program = create_references(tokens)
 
-    check_push_count(program)
+    # pprint([token.operator for token in program])
+
+    # check_push_count(program)
 
     # The real work
     assembly = generate_assembly(program)

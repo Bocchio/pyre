@@ -49,11 +49,11 @@ test3:
     code: |
         procedure main
             1 while dup 10 <= do
-                dup 1 = if 1 + end
-                dup 3 = if 1 + end
-                dup 5 = if 1 + end
-                dup 7 = if 1 + end
-                dup 9 = if 1 + end
+                if dup 1 = do 1 + end
+                if dup 3 = do 1 + end
+                if dup 5 = do 1 + end
+                if dup 7 = do 1 + end
+                if dup 9 = do 1 + end
                 dup peek drop
                 1 +
             end drop

@@ -1,7 +1,7 @@
 test1:
     code: |
         procedure main
-            1 if
+            if 1 do
                 2 peek drop
             end
         end
@@ -10,7 +10,7 @@ test1:
 test2:
     code: |
         procedure main
-            22 22 = if
+            if 22 22 = do
                 40 peek drop
             end
             50 peek drop
@@ -21,7 +21,7 @@ test2:
 test3:
     code: |
         procedure main
-            22 21 = if
+            if 22 21 = do
                 40 peek drop
             end
             50 peek drop
@@ -31,7 +31,7 @@ test3:
 test4:
     code: |
         procedure main
-            22 22 = if
+            if 22 22 = do
                 40 peek drop
             else
                 30 peek drop
@@ -44,7 +44,7 @@ test4:
 test5:
     code: |
         procedure main
-            22 21 = if
+            if 22 21 = do
                 40 peek drop
             else
                 30 peek drop
@@ -57,10 +57,10 @@ test5:
 test6:
     code: |
         procedure main
-            1 if
+            if 1 do
                 40 peek drop
             else
-                1 if
+                if 1 do
                     21 peek drop
                 else
                     20 peek drop
@@ -74,10 +74,10 @@ test6:
 test7:
     code: |
         procedure main
-            0 if
+            if 0 do
                 40 peek drop
             else
-                1 if
+                if 1 do
                     20 peek drop
                 else
                     21 peek drop
@@ -91,14 +91,14 @@ test7:
 test8:
     code: |
         procedure main
-            1 if
-                0 if
+            if 1 do
+                if 0 do
                     30 peek drop
                 else
                     24 peek drop
                 end
             else
-                1 if
+                if 1 do
                     20 peek drop
                 else
                     21 peek drop
@@ -108,4 +108,55 @@ test8:
         end
     expected: |
         24
+        50
+test9:
+    code: |
+        procedure main
+              if 0 do
+                20 peek drop
+            elif 0 do
+                30 peek drop
+            elif 1 do
+                24 peek drop
+            else
+                34 peek drop
+            end
+            50 peek drop
+        end
+    expected: |
+        24
+        50
+test10:
+    code: |
+        procedure main
+              if 0 do
+                20 peek drop
+            elif 0 do
+                30 peek drop
+            elif 0 do
+                24 peek drop
+            else
+                34 peek drop
+            end
+            50 peek drop
+        end
+    expected: |
+        34
+        50
+test11:
+    code: |
+        procedure main
+              if 1 do
+                20 peek drop
+            elif 0 do
+                30 peek drop
+            elif 1 do
+                24 peek drop
+            else
+                34 peek drop
+            end
+            50 peek drop
+        end
+    expected: |
+        20
         50

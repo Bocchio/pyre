@@ -66,7 +66,6 @@ def _check_push_procedure(token, program_iterator, stack_size=0) -> int:
 
 def check_push_count(program):
     """Checks the push count in the program."""
-    return
     program_iterator = iter(program)
     for token in program_iterator:
         assert token.operator is Operator.PROCEDURE, 'The only top level tokens are procedures.'

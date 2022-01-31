@@ -72,6 +72,8 @@ def pyre_split(stream: str) -> list:
         if c == '"' or c == "'":
             assert acc == ''
             acc = c + read_until_sentinel(stream_iterator, sentinel=c)
+        elif c == '[':
+            acc += c + read_until_sentinel(stream_iterator, sentinel=']')
         elif c.isspace():
             if acc != '':
                 items.append(acc)
