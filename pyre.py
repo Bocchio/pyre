@@ -144,9 +144,7 @@ def load_macros(program: list) -> list:
             start_token = stack.pop()
             # print(f'end   token {start_token.operator.name}')
             # print()
-            assert start_token.operator in {Operator.IF,
-                                            Operator.ELIF,
-                                            Operator.ELSE,
+            assert start_token.operator in {Operator.ELSE,
                                             Operator.DO,
                                             Operator.PROCEDURE,
                                             Operator.MACRO,
