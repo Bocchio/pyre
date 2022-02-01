@@ -7,10 +7,6 @@ from parsing_utils import string_to_db
 from definitions import PROCEDURE_PREFIX
 
 
-# def rindex(list, value):  # Yeah, I'm shadowing list because that's how I roll
-#     return len(list) - list[::-1].index(value) - 1
-
-
 def _ADD(self):
     return [
         '    pop     rax',
@@ -161,9 +157,9 @@ def _RETRIEVE(self):
        f'    ;; {global_state.symbols}',
         '    mov     rcx, [symbols]',   # rcx points to the last free slot
        f'    sub     rcx, {location}',  # rcx points to the variable
-       f'    mov     rcx, [rcx]',
+        '    mov     rcx, [rcx]',
         '    mov     rax, [rcx]',
-        '    push    rax',
+       f'    push    rax  ;; Push {self.value} onto the stack',
     ]
 def _MUTATE(self):
     i = global_state.symbols[::-1].index(self.value)
@@ -180,12 +176,12 @@ def _HARDPEEK(self):
     return [
         '    mov     rdi, [rsp]',
         '    call    peek',
-        # '    mov     rdi, [rsp + 8]',
-        # '    call    peek',
-        # '    mov     rdi, [rsp + 16]',
-        # '    call    peek',
-        # '    mov     rdi, [rsp + 24]',
-        # '    call    peek',
+        '    mov     rdi, [rsp + 8]',
+        '    call    peek',
+        '    mov     rdi, [rsp + 16]',
+        '    call    peek',
+        '    mov     rdi, [rsp + 24]',
+        '    call    peek',
     ]
 def _DEREFERENCE(self):
     return [
@@ -343,27 +339,18 @@ def _END(self):
                 '    syscall'
             ]
         else:
-            variables, return_variable = global_state.procedure_to_variables[start_token.value]
-            all_variables = variables + return_variable
-            to_remove = len(variables) * 8 + len(return_variable) * 8
+            input_variables, return_variables = global_state.procedure_to_variables[start_token.value]
+            all_variables = return_variables + ['__return_address'] + input_variables
+            to_remove = len(all_variables)
             for variable in all_variables:
                 global_state.symbols.pop()
             return [
-                '    ;; Move the return variable to rax.',
-                '    ;; Important: This moves the last variable in the symbols',
-                '    ;;            table. This variable will correspond to the',
-                '    ;;            return variable if a return variable exists',
-                '    ;;            to begin with.',
-                '    mov     rax, [symbols]  ;; Last free slot',
-                '    sub     rax, 8          ;; Last symbol',
-                '    mov     rax, [rax]      ;; Get the address of the variable',
-                '    mov     rax, [rax]      ;; Dereference the address',
                 '    ;; Remove variables from the symbols table',
                 '    mov     rcx, [symbols]',
-               f'    sub     rcx, {to_remove}',
+               f'    sub     rcx, {to_remove * 8}',
                 '    mov     [symbols], rcx',
                 '    ;; Remove variables from the stack',
-              *['    add     rsp, 8' for variable in all_variables],
+               f'    add     rsp, {8 * len(input_variables)}',
                 '    ret',
             ]
     else:
@@ -383,9 +370,18 @@ def _STACK_REFERENCE(self):
     return [
         '    push    rsp',
     ]
+
+#            [symbols]
+# STACK [var1, var2, addr]
+# STACK [ret1, ret2, ret3, addr, var1, var2]
+
+
+[]
 def _PROCEDURE(self):
-    variables, return_variable = global_state.procedure_to_variables[self.value]
-    all_variables = variables + return_variable
+    input_variables, return_variables = global_state.procedure_to_variables[self.value]
+    original_variables = input_variables + ['__return_address']
+    input_variables = ['__return_address'] + input_variables
+    all_variables = return_variables + input_variables
     global_state.symbols.extend(all_variables)
     inst = [f'{self.label}:', f'    ;; {global_state.symbols}']
     if self.value == 'main':
@@ -395,37 +391,56 @@ def _PROCEDURE(self):
             '    add     rcx, 8',
             '    mov     [symbols], rcx'
         ])
-    args = ['rdi', 'rsi', 'rdx', 'r10', 'r8', 'r9']
-    # Push whatever we received to the stack
-    for arg in args[:len(variables)][::-1]:
-        inst.append(f'    push    {arg}')
-    if return_variable:
-        inst.append(f'    push    0  ;; Return variable {return_variable[0]}')
-    for i, item in enumerate(all_variables):
-        length = len(all_variables) - 1
-        stack_location = (length - i) * 8
+    if self.value != 'main':
+        inst.extend(['    ;; Shift everything to make space for the address and return variables'])
         inst.extend([
-           f'    ;; Bind {item} {stack_location}',
-            '    mov     rax, rsp',
-           f'    add     rax, {stack_location}',  # rax has the address of the variable
-            '    mov     rcx, [symbols]',         # rcx points to the last free slot
-            '    mov     [rcx], rax',
-            '    add     rcx, 8',                 # update symbols so it points
-            '    mov     [symbols], rcx'          # to a free slot
+           f'    ;; {self.value}',
+        ])
+        shift_amount = (len(return_variables) + 1) * 8
+        shift_back_amount = len(input_variables) * 8 - shift_amount
+        if len(input_variables) > 1:
+            for i, variable in enumerate(original_variables[::-1]):
+                inst.extend([
+                    f'    mov     rcx, [rsp {i * 8:+}]',
+                    f'    mov     [rsp {i * 8 - shift_amount:+}], rcx  ;; Move {variable} ahead',
+                ])
+            inst.extend([
+                   f'    mov     rcx, [rsp {-shift_amount:+}]',
+                   f'    mov     [rsp {shift_back_amount:+}], rcx  ;; Move return address back'
+            ])
+        else:
+            inst.extend([
+                '    mov     rcx, [rsp]  ;; Take the return address',  # Take the return address
+               f'    mov     [rsp {-len(return_variables) * 8:+}], rcx  ;; Move it forward making space for the return variables'
+            ])
+        inst.extend([
+               f'    sub     rsp, {shift_amount - 8}  ;; Resize the stack accordingly',
+        ])
+
+
+
+        for i, item in enumerate(all_variables):
+            length = len(all_variables) - 1
+            stack_location = (length - i) * 8
+            inst.extend([
+               f'    ;; Bind {item} {stack_location}',
+                '    mov     rax, rsp',
+               f'    add     rax, {stack_location}',  # rax has the address of the variable
+                '    mov     rcx, [symbols]',         # rcx points to the last free slot
+                '    mov     [rcx], rax',
+                # TODO Do this once after the whole for loop is finished
+                '    add     rcx, 8',                 # update symbols so it points
+                '    mov     [symbols], rcx'          # to a free slot
+            ])
+        inst.extend([
+           f'    ;; {self.value}'
         ])
     return inst
 def _PROCEDURE_CALL(self):
-    variables, return_variable = global_state.procedure_to_variables[self.name]
-    args = ['rdi', 'rsi', 'rdx', 'r10', 'r8', 'r9']
-    args = args[:len(variables)]
-    load_variables = [f'    ;; {global_state.symbols}']
-    for arg in args:
-        load_variables.append(f'    pop     {arg}')
     return [
-         '    xor     rax, rax',
-         *load_variables,
-        f'    call    {self.value}',
-       *['    push    rax  ;; Push returned value to the stack' for _ in return_variable]
+       f'    ;; {global_state.symbols}',
+        '    xor     rax, rax',
+       f'    call    {self.value}',
     ]
 def _SYSCALL(self):
     assert 0 <= self.value <= 5
@@ -532,19 +547,19 @@ def create_token_PROCEDURE(operator, value, code_iterator, implementation):
     global_state.procedures.append(name)
 
     variables = []
-    return_variable = []
+    return_variables = []
     for variable in code_iterator:
         # TODO Check if we find a keyword and report an appropriate error.
         if variable == '--':
             break
         variables.append(variable)
-    next_item = next(code_iterator)
-    if next_item != 'in':
-        return_variable.append(next_item)
-        next_item = next(code_iterator)
-        assert next_item == 'in', f'Expected in after procedure signature. Got {next_item}.'
+    for variable in code_iterator:
+        # TODO Check if we find a keyword and report an appropriate error.
+        if variable == 'in':
+            break
+        return_variables.append(variable)
 
-    global_state.procedure_to_variables[name] = variables, return_variable
+    global_state.procedure_to_variables[name] = variables, return_variables
     token = Token(Operator.PROCEDURE, value=name, implementation=implementation)
 
     return token

@@ -1,0 +1,24 @@
+import "std"
+
+define NUM 20
+
+procedure main in
+    1 0 where num not_empty in
+        while num NUM < do
+            if num 3 % 0 = do
+                "Fizz" print
+                1 !not_empty
+            end
+            if num 5 % 0 = do
+                "Buzz" print
+                1 !not_empty
+            end
+            if not_empty not do
+                num show_uint
+            end
+            0 !not_empty
+            '\n' putchar
+            num++
+        end
+    end
+end

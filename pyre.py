@@ -217,8 +217,8 @@ def create_references(program: list) -> list:
             token.block = block
             block += 1
 
-            input_variables, return_variable = global_state.procedure_to_variables[token.value]
-            all_variables = input_variables + return_variable
+            input_variables, return_variables = global_state.procedure_to_variables[token.value]
+            all_variables = input_variables + return_variables
             variables.extend(all_variables)
             stack.append(token)  # Needs an end
         elif token.operator is Operator.IF:
@@ -286,8 +286,8 @@ def create_references(program: list) -> list:
                 for variable in start_token.value:
                     variables.pop()
             elif start_token.operator is Operator.PROCEDURE:
-                input_variables, return_variable = global_state.procedure_to_variables[start_token.value]
-                all_variables = input_variables + return_variable
+                input_variables, return_variables = global_state.procedure_to_variables[start_token.value]
+                all_variables = input_variables + return_variables
                 for variable in all_variables:
                     variables.pop()
             elif if_block:
